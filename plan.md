@@ -1,4 +1,4 @@
-# Distributed ROS2 Robotics Platform on Laptop Cluster
+# LOCAL DYNAMIC NODE DISCOVERY ROS CLUSTER
 
 ## 1. Project Overview
 This platform is a local-first, browser-accessible robotics simulation environment built on a dynamic Kubernetes (K3s) cluster. It is designed to run entirely on a network of consumer laptops without a dedicated server.
