@@ -1,0 +1,23 @@
+# Ingress probe mimicking the guest-browser entry point.
+#
+# Mirrors the real ros2-ingress.yaml rule for /sim: a browser hitting
+# http://ros-platform.local/sim (mapped to the k3d loadbalancer) should be
+# routed by Traefik to the test-svc backend.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: test-ingress
+spec:
+  rules:
+    - host: ros-platform.local
+      http:
+        paths:
+          # Prefix matches /sim and any path below it, like the platform's
+          # actual gzweb route.
+          - path: /sim
+            pathType: Prefix
+            backend:
+              service:
+                name: test-svc
+                port:
+                  number: 80

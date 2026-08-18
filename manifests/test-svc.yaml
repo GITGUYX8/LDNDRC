@@ -1,0 +1,18 @@
+# Backend Service for the ingress probe.
+#
+# Exposes the test-pod Deployment on a stable cluster IP so the Ingress
+# controller has a Service to route /sim traffic towards. Without this,
+# the Ingress has no backend target.
+apiVersion: v1
+kind: Service
+metadata:
+  name: test-svc
+spec:
+  # Must match the pod template labels in test-pod.yaml so the Service
+  # selects the intended pods (app: test-pod).
+  selector:
+    app: test-pod
+  ports:
+    - port: 80
+      targetPort: 80
+      name: http
