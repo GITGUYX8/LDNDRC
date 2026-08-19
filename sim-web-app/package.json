@@ -1,0 +1,30 @@
+{
+  "name": "ldndrc-sim-web-app",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "LDNDRC browser 3D view for /sim: renders the Gazebo Sim websocket scene with gzweb (Three.js/WebGL).",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "engines": {
+    "node": ">=24"
+  },
+  "dependencies": {
+    "@babel/runtime": "^7.28.4",
+    "gzweb": "^3.0.1"
+  },
+  "devDependencies": {
+    "vite": "^7.0.0"
+  },
+  "volta": {
+    "node": "24.16.0",
+    "npm": "11.16.0"
+  },
+  "allowScripts": {
+    "esbuild@0.27.7": true,
+    "protobufjs@6.11.6": true
+  }
+}

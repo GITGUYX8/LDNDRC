@@ -1,0 +1,56 @@
+<!doctype html>
+<!--
+  LDNDRC /sim viewer — the browser 3D view for a Gazebo Sim scene.
+  Connects to the workspace pod's Gazebo websocket bridge (default
+  ws://localhost:9002) and renders the live scene with gzweb (Three.js/WebGL).
+  Kept intentionally as a debug-capable harness: it logs every connection step
+  so blank canvases are diagnosable during integration.
+-->
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>LDNDRC Sim Viewer</title>
+  </head>
+  <body>
+    <main id="app">
+      <header class="topbar">
+        <div>
+          <h1>LDNDRC Sim Viewer</h1>
+          <p>Live Gazebo Sim scene from your workspace.</p>
+        </div>
+        <span id="statusBadge" class="status-badge" data-state="idle">Idle</span>
+      </header>
+
+      <section class="controls" aria-label="Gazebo websocket controls">
+        <label class="url-field" for="wsUrl">
+          <span>WebSocket URL</span>
+          <input id="wsUrl" name="wsUrl" type="url" value="ws://localhost:9002" autocomplete="off" />
+        </label>
+        <label class="auto-field" for="autoConnect">
+          <input id="autoConnect" name="autoConnect" type="checkbox" checked />
+          <span>Auto-connect</span>
+        </label>
+        <button id="connectButton" type="button">Connect</button>
+        <button id="disconnectButton" type="button" disabled>Disconnect</button>
+      </section>
+
+      <section class="viewer-layout">
+        <div id="gzScene" class="scene" aria-label="Gazebo scene viewer">
+          <div class="empty-state">
+            Enter the websocket URL and connect. The rendered Gazebo scene should appear here.
+          </div>
+        </div>
+        <aside class="debug-panel" aria-label="Connection debug log">
+          <div class="debug-header">
+            <h2>Debug</h2>
+            <button id="clearLogButton" type="button">Clear</button>
+          </div>
+          <pre id="debugLog" aria-live="polite"></pre>
+        </aside>
+      </section>
+    </main>
+
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
