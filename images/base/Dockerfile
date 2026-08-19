@@ -2,6 +2,8 @@
 # DDS is pinned to localhost (ROS_AUTOMATIC_DISCOVERY_RANGE=LOCALHOST) so each
 # pod is a fully isolated ROS2 island; ROS_DOMAIN_ID is a fallback default that
 # the workspace entrypoint overrides per-pod.
+
+# Mostly OS packages are installed in this image, so that the workspace image can be rebuilt
 FROM osrf/ros:jazzy-desktop-full-noble
 
 ARG USERNAME=student

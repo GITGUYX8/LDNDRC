@@ -1,6 +1,9 @@
 # LDNDRC workspace image: layers browser tools (code-server editor, Selkies
 # desktop streaming, Gazebo websocket bridge) on top of the LDNDRC base image.
 # Supervisord keeps the three services running and restarts them on crash.
+
+
+# MOST Browser tools are exposed on the host via port forwarding, so that they can be accessed
 FROM ldndrc/ros2-gz:jazzy-harmonic-base
 
 ARG USERNAME=student
