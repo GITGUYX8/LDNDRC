@@ -1,0 +1,6 @@
+/* XPM */
+static char * dframeIR_xpm[] = {
+"5 1 2 1",
+" 	c #2B2B2B",
+".	c #383838",
+"    ."};
