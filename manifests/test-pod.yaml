@@ -22,8 +22,17 @@ spec:
       nodeSelector:
         node-role.kubernetes.io/role: host
       containers:
-        # busybox is a minimal image and sleeping keeps the pod Running so
-        # scheduling/eviction can be observed without pulling a heavy stack.
+        # busybox is a minimal image. Its built-in httpd serves a tiny page
+        # on port 80 so the Service/Ingress probes can verify real HTTP
+        # traffic (a bare `sleep` pod would accept no connections and every
+        # routed request would fail with 502 Bad Gateway).
         - name: app
           image: busybox
-          command: ["sleep", "3600"]
+          command:
+            - /bin/sh
+            - -c
+            - mkdir -p /www/sim
+              && echo "test-pod reached through Traefik" > /www/sim/index.html
+              && httpd -f -p 80 -h /www
+          ports:
+            - containerPort: 80
