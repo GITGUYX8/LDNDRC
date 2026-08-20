@@ -1,0 +1,85 @@
+# ros2-platform StatefulSet: one private browser workspace per pod.
+#
+# Each pod runs the single-container workspace image (code-server editor,
+# Selkies desktop stream, Gazebo websocket bridge) under supervisord.
+# The pod name ordinal is what gives the workspace its isolated ROS domain:
+#   ros2-platform-0 -> ROS_DOMAIN_ID=100, ros2-platform-1 -> 101, ...
+# (see images/workspace/bin/entrypoint.sh). DDS is additionally pinned to
+# localhost via ROS_AUTOMATIC_DISCOVERY_RANGE=LOCALHOST, so topics can never
+# cross pod network namespaces even if two domains collided.
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: ros2-platform
+  labels:
+    app.kubernetes.io/name: ros2-platform
+    app.kubernetes.io/part-of: ldndrc
+spec:
+  serviceName: ros2-platform-svc
+  replicas: 3
+  selector:
+    matchLabels:
+      app: ros2-platform
+  template:
+    metadata:
+      labels:
+        app: ros2-platform
+        app.kubernetes.io/name: ros2-platform
+        app.kubernetes.io/part-of: ldndrc
+    spec:
+      nodeSelector:
+        node-role.kubernetes.io/role: host
+      securityContext:
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        fsGroupChangePolicy: OnRootMismatch
+      containers:
+        - name: ros2
+          image: ldndrc/ros2-gz:jazzy-harmonic-workspace
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+          env:
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: TERM
+              value: xterm-256color
+            - name: DISPLAY
+              value: ":50"
+            - name: SELKIES_DISPLAY
+              value: ":50"
+            - name: SELKIES_PORT
+              value: "8080"
+            - name: NO_AT_BRIDGE
+              value: "1"
+            - name: QT_X11_NO_MITSHM
+              value: "1"
+            - name: XDG_RUNTIME_DIR
+              value: /tmp/runtime-1000
+          ports:
+            - name: editor
+              containerPort: 7682
+            - name: desktop
+              containerPort: 8080
+            - name: gzweb
+              containerPort: 9002
+          # code-server answers HTTP on 7682 as soon as the workspace's
+          # supervised services have started; treat that as "pod ready".
+          readinessProbe:
+            httpGet:
+              path: /
+              port: editor
+            initialDelaySeconds: 15
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: "500m"
+              memory: "2Gi"
+            limits:
+              cpu: "2"
+              memory: "4Gi"
