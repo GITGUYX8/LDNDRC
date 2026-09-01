@@ -3,7 +3,7 @@
 ## 1. Project Overview
 This platform is a local-first, browser-accessible robotics simulation environment built on a dynamic Kubernetes (K3s) cluster. It is designed to run entirely on a network of consumer laptops without a dedicated server.
 
-High-end laptops ("Hosts") contribute their CPU, RAM, and GPU resources to run ROS2 and Gazebo simulations. Low-end laptops ("Guests") act as thin clients, accessing the platform via a web browser to write code (Monaco), view 3D simulation (Gazebo Sim web app), and stream desktop (Selkies).
+High-end laptops ("Hosts") contribute their CPU, RAM, and GPU resources to run ROS2 and Gazebo simulations. Low-end laptops ("Guests") act as thin clients, accessing the platform via a web browser to write code (code-server), view 3D simulation (Gazebo Sim web app), and stream desktop (Selkies).
 
 ### Key Characteristics
 *   **Workload per Pod:** 3-4 CPU cores, 4-8GB RAM, 1 GPU (time-sliced).
@@ -37,7 +37,7 @@ High-end laptops ("Hosts") contribute their CPU, RAM, and GPU resources to run R
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │                     Guest Laptop (Browser)                   │
-│  http://ros-platform.local/code   → Monaco editor           │
+│  http://ros-platform.local/code   → code-server editor      │
 │  http://ros-platform.local/sim    → 3D sim view (WebGL)     │
 │  http://ros-platform.local/stream → Selkies desktop stream  │
 └────────────────────┬────────────────────────────────────────┘
@@ -54,21 +54,20 @@ High-end laptops ("Hosts") contribute their CPU, RAM, and GPU resources to run R
 │              Host Laptop (GPU time-sliced x4)                │
 │                                                              │
 │  ┌────────── Pod A (user1) ────────────────────┐             │
-│  │ ros2-gazebo   │ ROS_DOMAIN_ID=101           │             │
-│  │   (sim + websocket_server plugin)           │             │
-│  │ sim-web-app  │ port 8080 (Three.js gzweb)   │             │
-│  │ selkies      │ port 8081 (WebRTC desktop)   │             │
-│  │ monaco-editor│ port 3000 (code)             │             │
+│  │ workspace    │ ROS_DOMAIN_ID=100            │             │
+│  │ code-server  │ port 7682 (editor)           │             │
+│  │ selkies      │ port 8080 (WebRTC desktop)   │             │
+│  │ gazebo-web   │ port 9002 (websocket bridge) │             │
 │  │                                              │             │
 │  │ DDS discovery: localhost only                │             │
 │  │ No cross-pod ROS2 visibility                 │             │
 │  └──────────────────────────────────────────────┘             │
 │                                                              │
 │  ┌────────── Pod B (user2) ────────────────────┐             │
-│  │ ros2-gazebo   │ ROS_DOMAIN_ID=102           │             │
-│  │ sim-web-app  │ port 8080                    │             │
-│  │ selkies      │ port 8081                    │             │
-│  │ monaco-editor│ port 3000                    │             │
+│  │ workspace    │ ROS_DOMAIN_ID=101            │             │
+│  │ code-server  │ port 7682                    │             │
+│  │ selkies      │ port 8080                    │             │
+│  │ gazebo-web   │ port 9002                    │             │
 │  │                                              │             │
 │  │ Fully isolated — no topic leakage to Pod A  │             │
 │  └──────────────────────────────────────────────┘             │
@@ -82,7 +81,7 @@ High-end laptops ("Hosts") contribute their CPU, RAM, and GPU resources to run R
 
 Each pod is a **fully isolated ROS2 environment**:
 
-- All 4 containers share the pod network namespace — DDS discovery/multicast stays on `localhost`
+- The workspace runs as a **single container** (code-server, Selkies, gazebo-web under supervisord) sharing the pod network namespace — DDS discovery/multicast stays on `localhost`
 - `ROS_DOMAIN_ID` is unique per pod (derived from StatefulSet ordinal)
 - Even if two pods land on the same host, their DDS traffic cannot interfere because they're on different virtual Ethernet pairs
 - The cluster provides only: GPU scheduling (which laptop runs the pod), web routing (Traefik), and resource guarantees
@@ -179,10 +178,12 @@ kubectl patch clusterpolicy cluster-policy -n gpu-operator --type='json' \
 - **StatefulSet** — ordinal index (0, 1, 2...) provides deterministic `ROS_DOMAIN_ID` per pod
 - **Single pod per user** — all containers share one pod network namespace; DDS traffic stays on `localhost`
 - **`websocket_server` plugin** — runs inside `gz-sim` process, no separate Gzweb server needed
-- **gzweb npm library** — served by a lightweight web app container for the Three.js/WebGL 3D view
-- **Selkies** — streams the interactive desktop (terminal + Monaco workspace) via WebRTC
+- **gzweb npm library** — served by the control panel (or a lightweight static host) for the Three.js/WebGL 3D view; the `websocket_server` plugin inside the workspace pod's `gz-sim` process provides the scene data on port 9002
+- **Selkies** — streams the interactive desktop (terminal + code-server workspace) via WebRTC
 
-**1. Pod Manifest (`ros2-platform.yaml`):**
+**1. Pod Manifest (`manifests/ros2-platform.yaml`):**
+One container per pod — the workspace image runs all three browser services under supervisord (code-server, Selkies, gazebo-web). The StatefulSet ordinal drives the per-pod `ROS_DOMAIN_ID` via the image's entrypoint. The full manifest lives in `manifests/ros2-platform.yaml`; key fields:
+
 ```yaml
 apiVersion: apps/v1
 kind: StatefulSet
@@ -191,67 +192,33 @@ metadata:
 spec:
   serviceName: ros2-platform-svc
   replicas: 3
-  selector:
-    matchLabels:
-      app: ros2-platform
   template:
-    metadata:
-      labels:
-        app: ros2-platform
     spec:
       nodeSelector:
         node-role.kubernetes.io/role: host
+      securityContext:
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
       containers:
-        # 1. ROS2 + Gazebo Sim (headless, with websocket_server plugin)
-        - name: ros2-gazebo
-          # Build a custom image: ROS2 Jazzy + Gazebo Sim Harmonic
-          # with websocket_server plugin enabled in the world SDF.
-          image: your-registry/ros2-gazebo-sim:latest
+        - name: ros2
+          image: ldndrc/ros2-gz:jazzy-harmonic-workspace
           env:
-            - name: POD_NAME
+            - name: POD_NAME          # entrypoint derives ROS_DOMAIN_ID = 100 + ordinal
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.name
-          resources:
-            requests:
-              cpu: "3"
-              memory: "4Gi"
-              nvidia.com/gpu: "1"
-            limits:
-              cpu: "4"
-              memory: "8Gi"
-              nvidia.com/gpu: "1"
-          command: ["/bin/bash", "-c"]
-          args:
-            - |
-              ORDINAL="${POD_NAME##*-}"
-              export ROS_DOMAIN_ID=$((100 + ORDINAL))
-              ros2 launch turtlebot3_gazebo empty_world.launch.py &
-              gz launch --verbose /etc/gz-sim/websocket.gzlaunch &
-              sleep infinity
-
-        # 2. Sim Web App (serves gzweb npm Three.js viewer, proxies WebSocket to gz-sim)
-        - name: sim-web-app
-          image: nginx:alpine
           ports:
-            - containerPort: 8080
-
-        # 3. Selkies (Desktop streaming via WebRTC)
-        - name: selkies
-          image: selkies-project/docker-selkies-egl-desktop:latest
-          env:
-            - name: SELKIES_ENCODER
-              value: "nvh264enc"
-            - name: SELKIES_GPU_VENDOR
-              value: "nvidia"
-          ports:
-            - containerPort: 8081
-
-        # 4. Monaco Editor (Code interface)
-        - name: monaco-editor
-          image: node:18-alpine
-          ports:
-            - containerPort: 3000
+            - name: editor            # code-server
+              containerPort: 7682
+            - name: desktop           # Selkies WebRTC stream
+              containerPort: 8080
+            - name: gzweb             # Gazebo websocket bridge
+              containerPort: 9002
+          readinessProbe:
+            httpGet:
+              path: /
+              port: editor
 ```
 
 **2. ROS_DOMAIN_ID Mapping:**
@@ -283,7 +250,7 @@ Build this into the custom Docker image alongside ROS2 + Gazebo Sim Harmonic.
 ### Phase 4: Web Routing & Final Platform Access
 **Goal:** Expose pods so Guest laptops can access them via browser. Use session affinity so a user stays on their assigned pod.
 
-**1. Service (`ros2-service.yaml`):**
+**1. Service (`manifests/ros2-service.yaml`):**
 ```yaml
 apiVersion: v1
 kind: Service
@@ -297,23 +264,23 @@ spec:
   selector:
     app: ros2-platform
   ports:
-    - name: web-monaco
-      port: 3000
-      targetPort: 3000
-    - name: web-gzweb
+    - name: editor
+      port: 7682
+      targetPort: editor
+    - name: desktop
       port: 8080
-      targetPort: 8080
-    - name: web-selkies
-      port: 8081
-      targetPort: 8081
+      targetPort: desktop
+    - name: gzweb
+      port: 9002
+      targetPort: gzweb
 ```
 
-**2. Ingress (`ros2-ingress.yaml`):**
+**2. Ingress (`manifests/ros2-ingress.yaml`):**
 ```yaml
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: platform-ingress
+  name: ros2-platform-ingress
 spec:
   rules:
     - host: ros-platform.local
@@ -325,21 +292,21 @@ spec:
               service:
                 name: ros2-platform-svc
                 port:
-                  number: 3000
-          - path: /sim
-            pathType: Prefix
-            backend:
-              service:
-                name: ros2-platform-svc
-                port:
-                  number: 8080
+                  number: 7682
           - path: /stream
             pathType: Prefix
             backend:
               service:
                 name: ros2-platform-svc
                 port:
-                  number: 8081
+                  number: 8080
+          - path: /sim
+            pathType: Prefix
+            backend:
+              service:
+                name: ros2-platform-svc
+                port:
+                  number: 9002
 ```
 
 ---
