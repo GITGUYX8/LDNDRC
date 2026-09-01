@@ -27,7 +27,8 @@ High-end laptops ("Hosts") contribute their CPU, RAM, and GPU resources to run R
 | **Simulation**         | Gazebo Sim Harmonic (LTS 2029)     | Physics simulation with `websocket_server` plugin for web rendering.     |
 | **3D Web View**        | gzweb (npm library)                | Three.js-based WebGL client — renders simulation in browser.             |
 | **Desktop Streaming**  | Selkies                            | WebRTC-based low-latency streaming for interactive desktop (terminal + code). |
-| **Code Editor**        | Monaco Editor                      | Browser-based code editor (VS Code core).                                |
+| **Code Editor**        | code-server                       | VS Code in the browser, integrated terminal (replaces standalone Monaco). |
+| **Control Panel (backend)** | Go (client-go, JWT, net/http) | Sessions, auth, pod provisioning, WebSocket proxy — single static binary. |
 
 ---
 
@@ -110,23 +111,28 @@ cat /var/lib/rancher/k3s/server/node-token
 ```
 
 **2. Auto-Discovery Agent (`join-cluster.sh`):**
+See `join-cluster.sh` at the project root — it accepts env var overrides for testing:
+
 ```bash
-#!/bin/bash
-MASTER_IP="192.168.1.50"
-NODE_TOKEN="YOUR_K3S_NODE_TOKEN"
-
-CPU=$(nproc)
-RAM_GB=$(($(grep MemTotal /proc/meminfo | awk '{print $2}') / 1024 / 1024))
-HAS_GPU=$(lspci | grep -i -E 'vga|3d|nvidia' | wc -l)
-
-if [ "$CPU" -ge 8 ] && [ "$RAM_GB" -ge 16 ] && [ "$HAS_GPU" -ge 1 ]; then
-    echo "High-end laptop detected. Joining as HOST."
-    curl -sfL https://get.k3s.io | K3S_URL=https://${MASTER_IP}:6443 K3S_TOKEN=${NODE_TOKEN} \
-    sh -s - agent --node-label="node-role.kubernetes.io/role=host"
-else
-    echo "Low-end laptop detected. Do not join cluster. Use browser to access platform."
-fi
+# Production usage (detects real hardware):
+export MASTER_IP=192.168.1.50
+export NODE_TOKEN=$(cat /var/lib/rancher/k3s/server/node-token)
+./join-cluster.sh
 ```
+
+The script supports `TEST_CPU`, `TEST_RAM` (GB), and `TEST_GPU` (nvidia|none) env vars to override hardware detection for testing without dedicated hardware:
+
+```bash
+# Simulate a Host laptop (12 cores, 16GB, NVIDIA GPU):
+TEST_CPU=12 TEST_RAM=16 TEST_GPU=nvidia ./join-cluster.sh
+# → "High-end laptop detected. Joining as HOST."
+
+# Simulate a Guest laptop (4 cores, 4GB, no GPU):
+TEST_CPU=4 TEST_RAM=4 TEST_GPU=none ./join-cluster.sh
+# → "Low-end laptop detected. Use browser to access platform."
+```
+
+**Testing (single-laptop):** Run `./test-join.sh` — no cluster, no Docker, no VMs needed. It tests all 4 hardware detection branches using env var overrides in ~2 seconds.
 
 ---
 
@@ -264,7 +270,8 @@ The StatefulSet creates pods named `ros2-platform-0`, `ros2-platform-1`, etc. Th
   <plugin name='gz::launch::WebsocketServer'
           filename='gz-launch-websocket-server'>
     <port>9002</port>
-    <max_connections>1</max_connections>
+    <publication_hz>30</publication_hz>
+    <max_connections>-1</max_connections>
   </plugin>
 </gz>
 ```
@@ -337,6 +344,44 @@ spec:
 
 ---
 
+### Phase 5: Go Control Panel (Backend)
+**Goal:** A lightweight session-management API and gateway in Go, deployed as a single static binary. Reuses the reference control panel's behavior (pod CRUD, auth, WebSocket proxy) without the Node runtime.
+
+**1. Module layout (`control-panel/`):**
+```
+control-panel/
+  cmd/server/main.go     — HTTP server entrypoint
+  internal/auth/         — JWT issue + verify
+  internal/sessions/     — pod create/status/delete via client-go
+  internal/gateway/      — httputil.ReverseProxy to session pods
+  internal/httpapi/      — REST handlers, health, metrics
+  web/                   — embedded control page (embed.FS)
+```
+
+**2. Key dependencies:**
+```go
+import (
+  "k8s.io/client-go/kubernetes"
+  "k8s.io/client-go/tools/clientcmd"
+  "github.com/golang-jwt/jwt/v5"
+)
+```
+
+**3. Endpoints:**
+| Method | Path | Purpose |
+|---|---|---|
+| POST | `/api/sessions` | Provision a workspace pod |
+| GET | `/api/sessions` | List sessions (status, node) |
+| GET | `/api/sessions/{id}` | Session detail |
+| DELETE | `/api/sessions/{id}` | Tear down a session |
+| POST | `/api/auth/login` | Issue JWT |
+| GET | `/healthz` | Liveness |
+| WS | `/ws/{session}` | WebSocket proxy into a pod (code-server / gzweb / selkies) |
+
+**4. Deployment:** static binary + minimal container (e.g. `gcr.io/distroless/static`) run as a Deployment, exposed via Traefik behind auth.
+
+---
+
 ## 5. Operational Guidelines
 
 ### How Nodes Join and Exit
@@ -347,14 +392,26 @@ spec:
 ### End User Experience
 1.  **Host Users:** Turn on laptops, run the script, and leave them plugged in.
 2.  **Guest Users:** Open browser (Chrome/Firefox) on any laptop.
-3.  Navigate to `http://ros-platform.local/code` to access the Monaco editor.
-4.  Write ROS2 code and hit "Run" — it executes inside the assigned pod, fully isolated from other users.
+3.  Navigate to `http://ros-platform.local/code` to access the code-server editor (VS Code in the browser).
+4.  Write ROS2 code and hit "Run" — it executes inside the assigned pod, fully isolated from other users. Use the built-in terminal to run `ros2 launch` directly in the browser.
 5.  Navigate to `http://ros-platform.local/sim` to view the Gazebo Sim 3D output via WebGL.
 6.  Navigate to `http://ros-platform.local/stream` for the Selkies interactive desktop stream (terminal + code workspace).
 
+### Control Panel (Go Backend)
+The session-management backend is written in Go and deployed as a single static binary — no Node runtime. It reuses the behavior of the reference control panel but in Go:
+
+| Backend need | Go solution |
+|---|---|
+| Create/delete session pods | `k8s.io/client-go` |
+| Auth / session tokens | `github.com/golang-jwt/jwt` |
+| WebSocket proxy to pods | `net/http/httputil.ReverseProxy` |
+| Serving a minimal control page | `embed.FS` or a small htmx page |
+| Metrics / health | `net/http` + Prometheus client |
+
 ### Security Model
 - Each pod has a unique `ROS_DOMAIN_ID` — DDS traffic is port-isolated even if a packet leaked out of localhost.
+- `ROS_AUTOMATIC_DISCOVERY_RANGE=LOCALHOST` pins ROS2 discovery to localhost as a second isolation layer.
 - DDS runs over UDP multicast on localhost only — no DDS packet ever traverses the pod network or Flannel overlay.
-- Flannel carries only HTTP (Monaco), WebSocket (gzweb), and WebRTC (Selkies) traffic.
+- Flannel carries only HTTP (code-server), WebSocket (gzweb), and WebRTC (Selkies) traffic.
 - Cross-pod ROS2 topic discovery is **impossible by design** — the network topology prevents it at the kernel level (different network namespaces).
-- **Recommended:** Add authentication (basic auth, OAuth2-proxy, or mTLS) in front of Traefik before opening beyond LAN.
+- **Recommended:** The Go control panel terminates auth (JWT) before traffic reaches Traefik; add basic auth / OAuth2-proxy / mTLS in front before opening beyond LAN.

@@ -1,0 +1,6 @@
+/* XPM */
+static char * dframeIL_xpm[] = {
+"5 1 2 1",
+" 	c #383838",
+".	c #2B2B2B",
+" ...."};

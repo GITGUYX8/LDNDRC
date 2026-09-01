@@ -1,0 +1,6 @@
+llvm-vs-code-extensions.vscode-clangd
+meta.pyrefly
+ms-python.debugpy
+ms-python.python
+ms-python.vscode-python-envs
+rust-lang.rust-analyzer

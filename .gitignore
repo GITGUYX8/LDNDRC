@@ -1,0 +1,47 @@
+# Sensitive / secrets
+.env
+.env.*
+*.pem
+*.key
+*.crt
+*.p12
+kubeconfig*
+*_kubeconfig*
+credentials.json
+service-account*.json
+
+# Local dev docs history (keep reports out of the repo by default;
+# uncomment if you want checkpoint reports committed)
+# local_dev_docs/
+
+# Go build artifacts
+control-panel/control-panel
+control-panel/*.exe
+bin/
+*.test
+*.out
+coverage.*
+
+# Node / npm (sim-web-app, gzweb)
+node_modules/
+dist/
+build/
+*.tsbuildinfo
+
+# Docker build junk
+*.tar
+*.tar.gz
+image-*.tar
+
+# k3d / cluster test leftovers
+.k3d/
+k3s-kubeconfig.yaml
+
+# OS / editor junk
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+.idea/
+.vscode/
+*.log

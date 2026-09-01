@@ -1,0 +1,10 @@
+<?xml version="1.0"?>
+<gz version="1.0">
+  <plugin
+    name="gz::launch::WebsocketServer"
+    filename="gz-launch-websocket-server">
+    <port>9002</port>
+    <publication_hz>30</publication_hz>
+    <max_connections>-1</max_connections>
+  </plugin>
+</gz>

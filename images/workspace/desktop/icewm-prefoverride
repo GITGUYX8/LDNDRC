@@ -1,0 +1,16 @@
+# Values here intentionally override the selected theme only where the workshop
+# image needs locked-down desktop behavior.
+TitleButtonsLeft="s"
+TitleButtonsRight="xmi"
+TitleButtonsSupported="xmis"
+TaskBarClockLeds=0
+
+TimeFormat="%H:%M IST"
+DateFormat="%a %d %b %Y %H:%M IST"
+DesktopBackgroundCenter=0
+DesktopBackgroundScaled=1
+DesktopBackgroundColor="rgb:1f/23/29"
+DesktopBackgroundImage="/usr/local/share/podlab/wallpaper.jpg"
+ShuffleBackgroundImages=0
+CycleBackgroundsPeriod=0
+WinMenuItems=""

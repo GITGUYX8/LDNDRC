@@ -1,0 +1,38 @@
+# Scheduling probe for the k3d test cluster.
+#
+# Proves that a pod carrying the platform's nodeSelector only lands on
+# nodes labelled node-role.kubernetes.io/role=host — mirroring how the real
+# ros2-platform StatefulSet will be routed to Host laptops only.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: test-pod
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: test-pod
+  template:
+    metadata:
+      labels:
+        app: test-pod
+    spec:
+      # Only nodes labelled role=host (via join-cluster.sh's --node-label)
+      # are eligible. Nodes that join as Guests are never scheduled here.
+      nodeSelector:
+        node-role.kubernetes.io/role: host
+      containers:
+        # busybox is a minimal image. Its built-in httpd serves a tiny page
+        # on port 80 so the Service/Ingress probes can verify real HTTP
+        # traffic (a bare `sleep` pod would accept no connections and every
+        # routed request would fail with 502 Bad Gateway).
+        - name: app
+          image: busybox
+          command:
+            - /bin/sh
+            - -c
+            - mkdir -p /www/sim
+              && echo "test-pod reached through Traefik" > /www/sim/index.html
+              && httpd -f -p 80 -h /www
+          ports:
+            - containerPort: 80
