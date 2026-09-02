@@ -8,6 +8,7 @@ import (
 
 	"github.com/ldndrc/control-panel/internal/auth"
 	"github.com/ldndrc/control-panel/internal/httpapi"
+	"github.com/ldndrc/control-panel/internal/sessions"
 )
 
 func main() {
@@ -22,10 +23,11 @@ func main() {
 	}
 
 	authSvc := auth.NewService([]byte(jwtSecret), 24*time.Hour)
+	sessionStore := sessions.NewStore()
 
 	server := &http.Server{
 		Addr:              ":" + port,
-		Handler:           httpapi.NewRouter(authSvc),
+		Handler:           httpapi.NewRouter(authSvc, sessionStore),
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 

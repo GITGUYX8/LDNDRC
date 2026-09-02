@@ -9,13 +9,17 @@ import (
 	"strings"
 
 	"github.com/ldndrc/control-panel/internal/auth"
+	"github.com/ldndrc/control-panel/internal/sessions"
 )
 
 // sessionStore is the seam for the Kubernetes-backed session manager.
 // The client-go implementation lives in internal/sessions and is wired in
 // once the cluster manifests are finalised.
 type sessionStore interface {
-	Provision(username string) error
+	Create(username string) (sessions.Session, error)
+	List(username string) []sessions.Session
+	Get(username, id string) (sessions.Session, error)
+	Delete(username, id string) (sessions.Session, error)
 }
 
 // NewRouter builds the root handler. authSvc provides JWT issuing/verifying;
@@ -55,16 +59,68 @@ func NewRouter(authSvc *auth.Service, store ...sessionStore) http.Handler {
 				writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
 				return
 			}
-			if err := store[0].Provision(claims.Username); err != nil {
+			session, err := store[0].Create(claims.Username)
+			if err != nil {
+				if err == sessions.ErrSessionExists {
+					writeJSON(w, http.StatusConflict, map[string]string{"error": err.Error()})
+					return
+				}
 				log.Printf("provision failed for %s: %v", claims.Username, err)
 				writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "provision failed"})
 				return
 			}
-			writeJSON(w, http.StatusAccepted, map[string]string{"status": "provisioning"})
+			writeJSON(w, http.StatusAccepted, map[string]any{"session": session})
+		})
+
+		mux.HandleFunc("GET /api/sessions", func(w http.ResponseWriter, r *http.Request) {
+			claims, ok := bearerClaims(r, authSvc)
+			if !ok {
+				writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+				return
+			}
+			writeJSON(w, http.StatusOK, map[string]any{"sessions": store[0].List(claims.Username)})
+		})
+
+		mux.HandleFunc("GET /api/sessions/{id}", func(w http.ResponseWriter, r *http.Request) {
+			claims, ok := bearerClaims(r, authSvc)
+			if !ok {
+				writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+				return
+			}
+			session, err := store[0].Get(claims.Username, r.PathValue("id"))
+			if err != nil {
+				writeSessionError(w, err)
+				return
+			}
+			writeJSON(w, http.StatusOK, map[string]any{"session": session})
+		})
+
+		mux.HandleFunc("DELETE /api/sessions/{id}", func(w http.ResponseWriter, r *http.Request) {
+			claims, ok := bearerClaims(r, authSvc)
+			if !ok {
+				writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+				return
+			}
+			session, err := store[0].Delete(claims.Username, r.PathValue("id"))
+			if err != nil {
+				writeSessionError(w, err)
+				return
+			}
+			writeJSON(w, http.StatusOK, map[string]any{"session": session})
 		})
 	}
 
 	return logRequests(mux)
+}
+
+func writeSessionError(w http.ResponseWriter, err error) {
+	status := http.StatusInternalServerError
+	if err == sessions.ErrNotFound {
+		status = http.StatusNotFound
+	} else if err == sessions.ErrForbidden {
+		status = http.StatusForbidden
+	}
+	writeJSON(w, status, map[string]string{"error": err.Error()})
 }
 
 func healthHandler(w http.ResponseWriter, _ *http.Request) {
