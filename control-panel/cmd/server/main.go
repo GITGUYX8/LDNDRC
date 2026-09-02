@@ -24,6 +24,21 @@ func main() {
 
 	authSvc := auth.NewService([]byte(jwtSecret), 24*time.Hour)
 	sessionStore := sessions.NewStore()
+	if os.Getenv("KUBERNETES_SERVICE_HOST") != "" || os.Getenv("KUBERNETES_IN_CLUSTER") == "true" {
+		namespace := os.Getenv("SESSION_NAMESPACE")
+		if namespace == "" {
+			namespace = "ldndrc"
+		}
+		image := os.Getenv("SESSION_IMAGE")
+		if image == "" {
+			image = "ldndrc/ros2-gz:jazzy-harmonic-workspace"
+		}
+		provisioner, err := sessions.NewInClusterProvisioner(namespace, image)
+		if err != nil {
+			log.Fatalf("configure Kubernetes session provisioner: %v", err)
+		}
+		sessionStore = sessions.NewStoreWithProvisioner(provisioner)
+	}
 
 	server := &http.Server{
 		Addr:              ":" + port,
