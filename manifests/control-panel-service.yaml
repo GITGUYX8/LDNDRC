@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: ldndrc-control-panel
+  namespace: ldndrc
+  labels:
+    app.kubernetes.io/name: ldndrc-control-panel
+    app.kubernetes.io/part-of: ldndrc
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: ldndrc-control-panel
+  ports:
+    - name: http
+      port: 8082
+      targetPort: http

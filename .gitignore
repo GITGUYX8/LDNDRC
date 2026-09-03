@@ -9,6 +9,7 @@ kubeconfig*
 *_kubeconfig*
 credentials.json
 service-account*.json
+manifests/control-panel-secret.yaml
 
 # Local dev docs history (keep reports out of the repo by default;
 # uncomment if you want checkpoint reports committed)

@@ -1,0 +1,79 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ldndrc-control-panel
+  namespace: ldndrc
+  labels:
+    app.kubernetes.io/name: ldndrc-control-panel
+    app.kubernetes.io/part-of: ldndrc
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: ldndrc-control-panel
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: ldndrc-control-panel
+        app.kubernetes.io/part-of: ldndrc
+    spec:
+      serviceAccountName: ldndrc-control-panel
+      automountServiceAccountToken: true
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: control-panel
+          image: ldndrc/control-panel:dev
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          env:
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: ldndrc-control-panel
+                  key: JWT_SECRET
+            - name: KUBERNETES_IN_CLUSTER
+              value: "true"
+            - name: SESSION_NAMESPACE
+              value: ldndrc
+            - name: SESSION_IMAGE
+              value: ldndrc/ros2-gz:jazzy-harmonic-workspace
+            - name: SESSION_HOME_STORAGE
+              value: 5Gi
+            - name: SESSION_GPU_LIMIT
+              value: "1"
+            - name: CONTROL_PANEL_PORT
+              value: "8082"
+          ports:
+            - name: http
+              containerPort: 8082
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 3
+            periodSeconds: 5
+            timeoutSeconds: 2
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 2
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 250m
+              memory: 256Mi
