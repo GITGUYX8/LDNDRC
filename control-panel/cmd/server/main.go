@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/ldndrc/control-panel/internal/auth"
+	"github.com/ldndrc/control-panel/internal/gateway"
 	"github.com/ldndrc/control-panel/internal/httpapi"
 	"github.com/ldndrc/control-panel/internal/sessions"
 )
@@ -39,10 +40,12 @@ func main() {
 		}
 		sessionStore = sessions.NewStoreWithProvisioner(provisioner)
 	}
+	apiHandler := httpapi.NewRouter(authSvc, sessionStore)
+	gatewayHandler := gateway.NewSessionHandler(authSvc, sessionStore, apiHandler)
 
 	server := &http.Server{
 		Addr:              ":" + port,
-		Handler:           httpapi.NewRouter(authSvc, sessionStore),
+		Handler:           gatewayHandler,
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 

@@ -48,6 +48,12 @@ type Provisioner interface {
 	Delete(Session) error
 }
 
+// StatusProvider lets a Kubernetes-backed provisioner reconcile workload
+// readiness before the gateway accepts browser traffic.
+type StatusProvider interface {
+	Ready(Session) (bool, error)
+}
+
 // Store tracks session ownership and lifecycle. The default store is
 // in-memory; production persistence can be added without changing the API.
 type Store struct {
@@ -136,6 +142,35 @@ func (s *Store) Get(username, id string) (Session, error) {
 	}
 	if session.Username != username {
 		return Session{}, ErrForbidden
+	}
+	return session, nil
+}
+
+// Current returns the authenticated user's active session.
+func (s *Store) Current(username string) (Session, error) {
+	s.mu.RLock()
+	id, ok := s.byUser[username]
+	if !ok {
+		s.mu.RUnlock()
+		return Session{}, ErrNotFound
+	}
+	session := s.sessions[id]
+	provisioner := s.provisioner
+	s.mu.RUnlock()
+	if statusProvider, ok := provisioner.(StatusProvider); ok && session.Status == StatusProvisioning {
+		ready, err := statusProvider.Ready(session)
+		if err != nil {
+			return Session{}, fmt.Errorf("check session readiness: %w", err)
+		}
+		if ready {
+			session, err = s.setStatus(username, id, StatusReady, "")
+			if err != nil {
+				return Session{}, err
+			}
+		}
+	}
+	if session.Status == StatusStopped || session.Status == StatusError {
+		return Session{}, ErrNotFound
 	}
 	return session, nil
 }

@@ -1,0 +1,53 @@
+# Reference-aligned host routing. The old ros2-ingress.yaml remains available
+# during migration and should be removed only after these routes are verified.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ldndrc-control-panel
+  namespace: ldndrc
+  labels:
+    app.kubernetes.io/name: ldndrc-control-panel
+    app.kubernetes.io/part-of: ldndrc
+spec:
+  ingressClassName: traefik
+  rules:
+    - host: control.ros-platform.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: ldndrc-control-panel
+                port:
+                  name: http
+    - host: editor.ros-platform.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: ldndrc-control-panel
+                port:
+                  name: http
+    - host: desktop.ros-platform.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: ldndrc-control-panel
+                port:
+                  name: http
+    - host: gazebo.ros-platform.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: ldndrc-control-panel
+                port:
+                  name: http

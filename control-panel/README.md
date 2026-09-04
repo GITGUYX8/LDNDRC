@@ -60,3 +60,21 @@ Expected health response:
 The session image must already be available to the K3s nodes. Session creation
 will remain in `provisioning` until the next status-reconciliation and gateway
 chunk is implemented.
+
+## Reference-aligned gateway hosts
+
+The reference project routes browser tools through the control panel using
+hostnames rather than path prefixes. Apply `../manifests/control-panel-ingress.yaml`
+after making these names resolve to the Traefik entry point:
+
+```text
+control.ros-platform.local
+editor.ros-platform.local
+gazebo.ros-platform.local
+```
+
+The current Go gateway authenticates the `editor`, `desktop`, and `gazebo`
+hosts with the HttpOnly session cookie, then resolves the authenticated user's
+ready session Service. The Deployment sets `COOKIE_DOMAIN=.ros-platform.local`
+so the browser sends the cookie to all four subdomains. Keep `ros2-ingress.yaml`
+in place until the new host routes have been verified on K3s.

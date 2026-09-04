@@ -86,6 +86,22 @@ func (p *KubernetesProvisioner) Delete(session Session) error {
 	return nil
 }
 
+// Ready reports whether the session Deployment has an available replica.
+func (p *KubernetesProvisioner) Ready(session Session) (bool, error) {
+	deployment, err := p.resource(deploymentGVR).Get(context.Background(), session.WorkloadName, metav1.GetOptions{})
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			return false, nil
+		}
+		return false, err
+	}
+	available, found, err := unstructured.NestedInt64(deployment.Object, "status", "availableReplicas")
+	if err != nil {
+		return false, err
+	}
+	return found && available > 0, nil
+}
+
 func (p *KubernetesProvisioner) resource(gvr schema.GroupVersionResource) dynamic.ResourceInterface {
 	return p.client.Resource(gvr).Namespace(p.namespace)
 }

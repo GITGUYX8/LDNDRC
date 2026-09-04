@@ -29,7 +29,7 @@ func NewRouter(authSvc *auth.Service, store ...sessionStore) http.Handler {
 
 	mux.HandleFunc("GET /healthz", healthHandler)
 
-	mux.HandleFunc("POST /api/auth/login", func(w http.ResponseWriter, r *http.Request) {
+		mux.HandleFunc("POST /api/auth/login", func(w http.ResponseWriter, r *http.Request) {
 		var req struct {
 			Username string `json:"username"`
 			Password string `json:"password"`
@@ -44,13 +44,14 @@ func NewRouter(authSvc *auth.Service, store ...sessionStore) http.Handler {
 			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "username and password required"})
 			return
 		}
-		token, err := authSvc.Issue(req.Username)
+			token, err := authSvc.Issue(req.Username)
 		if err != nil {
 			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "token issue failed"})
 			return
-		}
-		writeJSON(w, http.StatusOK, map[string]string{"token": token})
-	})
+			}
+			authSvc.SetSessionCookie(w, token)
+			writeJSON(w, http.StatusOK, map[string]string{"token": token})
+		})
 
 	if len(store) > 0 && store[0] != nil {
 		mux.HandleFunc("POST /api/sessions", func(w http.ResponseWriter, r *http.Request) {
