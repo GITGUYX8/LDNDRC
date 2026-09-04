@@ -15,8 +15,8 @@ import (
 
 var (
 	deploymentGVR = schema.GroupVersionResource{Group: "apps", Version: "v1", Resource: "deployments"}
-	serviceGVR   = schema.GroupVersionResource{Group: "", Version: "v1", Resource: "services"}
-	pvcGVR       = schema.GroupVersionResource{Group: "", Version: "v1", Resource: "persistentvolumeclaims"}
+	serviceGVR    = schema.GroupVersionResource{Group: "", Version: "v1", Resource: "services"}
+	pvcGVR        = schema.GroupVersionResource{Group: "", Version: "v1", Resource: "persistentvolumeclaims"}
 )
 
 // KubernetesProvisioner adapts the reference project's session template to
@@ -108,9 +108,9 @@ func (p *KubernetesProvisioner) resource(gvr schema.GroupVersionResource) dynami
 
 func (p *KubernetesProvisioner) resources(session Session) []*unstructured.Unstructured {
 	labels := map[string]interface{}{
-		"app.kubernetes.io/name": "ldndrc-ros2-session",
+		"app.kubernetes.io/name":    "ldndrc-ros2-session",
 		"app.kubernetes.io/part-of": "ldndrc",
-		"ldndrc/session-id": session.ID,
+		"ldndrc/session-id":         session.ID,
 	}
 
 	pvc := &unstructured.Unstructured{Object: map[string]interface{}{
@@ -156,12 +156,12 @@ func (p *KubernetesProvisioner) resources(session Session) []*unstructured.Unstr
 			map[string]interface{}{"name": "gzweb", "containerPort": int64(9002)},
 		},
 		"readinessProbe": map[string]interface{}{
-			"httpGet": map[string]interface{}{"path": "/", "port": "editor"},
+			"httpGet":             map[string]interface{}{"path": "/", "port": "editor"},
 			"initialDelaySeconds": int64(15), "periodSeconds": int64(10),
 			"timeoutSeconds": int64(3), "failureThreshold": int64(3),
 		},
 		"securityContext": map[string]interface{}{"allowPrivilegeEscalation": false, "capabilities": map[string]interface{}{"drop": []interface{}{"ALL"}}},
-		"volumeMounts": []interface{}{map[string]interface{}{"name": "home", "mountPath": "/home/student"}},
+		"volumeMounts":    []interface{}{map[string]interface{}{"name": "home", "mountPath": "/home/student"}},
 	}
 	deployment := &unstructured.Unstructured{Object: map[string]interface{}{
 		"apiVersion": "apps/v1", "kind": "Deployment",
@@ -171,10 +171,10 @@ func (p *KubernetesProvisioner) resources(session Session) []*unstructured.Unstr
 			"template": map[string]interface{}{
 				"metadata": map[string]interface{}{"labels": labels},
 				"spec": map[string]interface{}{
-					"nodeSelector": map[string]interface{}{"node-role.kubernetes.io/role": "host"},
+					"nodeSelector":    map[string]interface{}{"node-role.kubernetes.io/role": "host"},
 					"securityContext": map[string]interface{}{"runAsNonRoot": true, "runAsUser": int64(1000), "runAsGroup": int64(1000), "fsGroup": int64(1000), "fsGroupChangePolicy": "OnRootMismatch", "seccompProfile": map[string]interface{}{"type": "RuntimeDefault"}},
-					"containers": []interface{}{container},
-					"volumes": []interface{}{map[string]interface{}{"name": "home", "persistentVolumeClaim": map[string]interface{}{"claimName": session.WorkloadName + "-home"}}},
+					"containers":      []interface{}{container},
+					"volumes":         []interface{}{map[string]interface{}{"name": "home", "persistentVolumeClaim": map[string]interface{}{"claimName": session.WorkloadName + "-home"}}},
 				},
 			},
 		},

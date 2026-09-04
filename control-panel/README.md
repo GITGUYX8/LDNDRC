@@ -10,6 +10,12 @@ uses namespace-scoped RBAC to create a Deployment, Service, and home PVC in the
 Build from this directory and make the image available to the K3s nodes:
 
 ```bash
+docker build -t ldndrc/control-panel:dev .
+```
+
+Or with podman:
+
+```bash
 podman build -t ldndrc/control-panel:dev .
 ```
 
@@ -57,9 +63,9 @@ Expected health response:
 {"status":"ok"}
 ```
 
-The session image must already be available to the K3s nodes. Session creation
-will remain in `provisioning` until the next status-reconciliation and gateway
-chunk is implemented.
+The session image must already be available to the K3s nodes. A session stays
+in `provisioning` until its Deployment reports an available replica, at which
+point the store promotes it to `ready` and the gateway starts routing to it.
 
 ## Reference-aligned gateway hosts
 
@@ -70,6 +76,7 @@ after making these names resolve to the Traefik entry point:
 ```text
 control.ros-platform.local
 editor.ros-platform.local
+desktop.ros-platform.local
 gazebo.ros-platform.local
 ```
 
