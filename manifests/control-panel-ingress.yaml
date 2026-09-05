@@ -1,5 +1,6 @@
-# Reference-aligned host routing. The old ros2-ingress.yaml remains available
-# during migration and should be removed only after these routes are verified.
+# Reference-aligned host routing. The legacy path-based ros2-ingress.yaml
+# (/code, /stream, /sim on the bare hostname) was removed after these host
+# routes were verified live (checkpoint-13).
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
