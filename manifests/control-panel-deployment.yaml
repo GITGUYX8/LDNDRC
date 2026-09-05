@@ -48,8 +48,12 @@ spec:
               value: .ros-platform.local
             - name: GATEWAY_HOST_SUFFIX
               value: ros-platform.local
+            # Demo-cluster value: tiny stand-in HTTP server so sessions can
+            # reach `ready` and the gateway path is verifiable without the
+            # full Jazzy/Harmonic workspace image. Production uses
+            # ldndrc/ros2-gz:jazzy-harmonic-workspace.
             - name: SESSION_IMAGE
-              value: ldndrc/ros2-gz:jazzy-harmonic-workspace
+              value: ldndrc/demo-standin:dev
             - name: SESSION_HOME_STORAGE
               value: 5Gi
             # Demo-cluster value: the k3d node has no GPU, so sessions omit
