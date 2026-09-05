@@ -133,11 +133,13 @@ our API with their cookie attached.
 - Verify phase-wise: UI-1 login+launch, UI-2 workspace shell, UI-3 admin view (matches the design doc's phasing).
 - Effort: days to a week.
 
-### R5 — Host onboarding `ldndrc-join` (large, design exists)
+### R5 — Host onboarding `ldndrc-join` (large, design ready)
 
-`onboarding-design-report.md` specifies the zero-touch flow: mDNS discovery,
-approval dashboard, short-lived K3s tokens, cross-platform join binary.
-Today only the manual `join-cluster.sh` path exists.
+`onboarding-design-report.md` (amended 2026-09-06 for the in-cluster control
+panel) specifies the zero-touch flow: mDNS discovery, nodes register/approve
+API, short-lived bootstrap tokens via client-go, cross-platform join binary.
+Today only the manual `join-cluster.sh` path exists. Approval dashboard UI
+is deferred until the R4 frontend lands — P1 approval is API/`curl`-driven.
 
 - Implement in the report's phase order (P1 nodes API → P6 docs), keeping
   the bash path until the Go binary is proven on real hardware.
