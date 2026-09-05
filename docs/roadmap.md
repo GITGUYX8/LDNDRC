@@ -70,7 +70,7 @@ flowchart TB
     WS["Workspace pod<br/>(demo-standin TODAY)"]:::missing
     RealWS["Real Jazzy/Harmonic image"]:::missing
     Head["Headlamp dashboard"]:::done
-    OldIng["ros2-ingress.yaml<br/>legacy /code /stream /sim"]:::legacy
+    OldIng["ros2-ingress.yaml<br/>REMOVED (checkpoint-13)"]:::done
     UI["Student frontend<br/>(login/launch/workspace)"]:::missing
     Join["ldndrc-join onboarding"]:::missing
 
@@ -90,19 +90,19 @@ Legend:
 |---|---|
 | Green | Built, deployed, verified live |
 | Amber | Missing or provisional — real remaining work |
-| Red | Legacy — works but scheduled for removal |
+| Red | Legacy — works but scheduled for removal (none left after R1) |
 
 ## 2. Remaining Work in Detail
 
-### R1 — Remove legacy ingress (small, unblocked)
+### R1 — Remove legacy ingress (done in checkpoint-13)
 
-`manifests/ros2-ingress.yaml` still routes `/code`, `/stream`, `/sim` on the
+`manifests/ros2-ingress.yaml` routed `/code`, `/stream`, `/sim` on the
 bare hostname to the old shared `ros2-platform-svc`. Host-based routing
-(CP07, proven live in CP09/CP12) replaces it.
-
-- Delete `manifests/ros2-ingress.yaml` (+ `ros2-service.yaml` / `ros2-platform.yaml` if nothing references them — check first).
-- Verify: `kubectl get ingress -A`, editor/desktop/gazebo/control hosts still 200/401/503 as appropriate, no route serves the old paths.
-- Effort: under an hour.
+(CP07, proven live in CP09/CP12) replaced it, so the ingress, the shared
+Service (`ros2-service.yaml`), and the fixed StatefulSet
+(`ros2-platform.yaml`) were deleted. Verified: only the control-panel
+ingress exists live, gateway hosts keep their proven 200/502/401 pattern,
+and the old `/code` path 404s.
 
 ### R2 — Session persistence (medium, observed pain twice)
 
@@ -168,7 +168,7 @@ stage.
 
 | Step | Item | Why here | Effort |
 |---|---|---|---|
-| 1 | R1 legacy ingress removal | Unblocked, tiny, removes a footgun | < 1h |
+| 1 | ~~R1 legacy ingress removal~~ done (checkpoint-13) | Cleanup complete | < 1h |
 | 2 | R3 CSRF protection | Small, closes a real browser-threat hole | 0.5 day |
 | 3 | R2 session persistence | Medium; stops the restart-orphan pain | 0.5–2 days |
 | 4 | R4 student frontend | Large but fully unblocked by the verified API | days |

@@ -83,5 +83,6 @@ gazebo.ros-platform.local
 The current Go gateway authenticates the `editor`, `desktop`, and `gazebo`
 hosts with the HttpOnly session cookie, then resolves the authenticated user's
 ready session Service. The Deployment sets `COOKIE_DOMAIN=.ros-platform.local`
-so the browser sends the cookie to all four subdomains. Keep `ros2-ingress.yaml`
-in place until the new host routes have been verified on K3s.
+so the browser sends the cookie to all four subdomains. The legacy
+path-based `ros2-ingress.yaml` was removed after these host routes were
+verified live on K3s.
