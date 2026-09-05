@@ -139,13 +139,22 @@ func (p *KubernetesProvisioner) resources(session Session) []*unstructured.Unstr
 		map[string]interface{}{"name": "NVIDIA_VISIBLE_DEVICES", "value": "all"},
 		map[string]interface{}{"name": "NVIDIA_DRIVER_CAPABILITIES", "value": "graphics,utility,compute,video,display"},
 	}
+	requests := map[string]interface{}{
+		"cpu": "500m", "memory": "2Gi",
+	}
+	limits := map[string]interface{}{
+		"cpu": "2", "memory": "4Gi",
+	}
+	// GPU time-slices are requested only when configured: a "0" (or empty)
+	// SESSION_GPU_LIMIT lets sessions schedule on GPU-less nodes such as
+	// this repo's k3d demo cluster. Production Hosts keep the default "1".
+	if p.gpuLimit != "" && p.gpuLimit != "0" {
+		requests["nvidia.com/gpu"] = p.gpuLimit
+		limits["nvidia.com/gpu"] = p.gpuLimit
+	}
 	resources := map[string]interface{}{
-		"requests": map[string]interface{}{
-			"cpu": "500m", "memory": "2Gi", "nvidia.com/gpu": p.gpuLimit,
-		},
-		"limits": map[string]interface{}{
-			"cpu": "2", "memory": "4Gi", "nvidia.com/gpu": p.gpuLimit,
-		},
+		"requests": requests,
+		"limits":   limits,
 	}
 	container := map[string]interface{}{
 		"name": "ros2", "image": p.image, "imagePullPolicy": "IfNotPresent",

@@ -52,8 +52,11 @@ spec:
               value: ldndrc/ros2-gz:jazzy-harmonic-workspace
             - name: SESSION_HOME_STORAGE
               value: 5Gi
+            # Demo-cluster value: the k3d node has no GPU, so sessions omit
+            # the nvidia.com/gpu request and can schedule. Production
+            # Hosts use "1".
             - name: SESSION_GPU_LIMIT
-              value: "1"
+              value: "0"
             - name: CONTROL_PANEL_PORT
               value: "8082"
           ports:
