@@ -141,8 +141,9 @@ API, short-lived bootstrap tokens via client-go, cross-platform join binary.
 Today only the manual `join-cluster.sh` path exists. Approval dashboard UI
 is deferred until the R4 frontend lands — P1 approval is API/`curl`-driven.
 
-- Implement in the report's phase order (P1 nodes API → P6 docs), keeping
-  the bash path until the Go binary is proven on real hardware.
+- Implement in the report's phase order — **P1 nodes API done
+  (checkpoint-14)**; P2–P6 next — keeping the bash path until the Go binary
+  is proven on real hardware.
 - Verify: a real second laptop joins as Host, appears Ready with the Host
   label, and schedules session pods; denial path tested too.
 - Effort: several days; needs a second physical machine for the real proof.

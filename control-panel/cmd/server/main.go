@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"log"
 	"net/http"
 	"os"
@@ -9,7 +10,10 @@ import (
 	"github.com/ldndrc/control-panel/internal/auth"
 	"github.com/ldndrc/control-panel/internal/gateway"
 	"github.com/ldndrc/control-panel/internal/httpapi"
+	"github.com/ldndrc/control-panel/internal/nodes"
 	"github.com/ldndrc/control-panel/internal/sessions"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 )
 
 func main() {
@@ -25,6 +29,18 @@ func main() {
 
 	authSvc := auth.NewService([]byte(jwtSecret), 24*time.Hour)
 	sessionStore := sessions.NewStore()
+	nodeDB := os.Getenv("NODES_DB")
+	if nodeDB == "" {
+		nodeDB = "/var/lib/ldndrc/nodes.json"
+	}
+	nodeStore, err := nodes.NewStore(nodeDB)
+	if err != nil {
+		log.Fatalf("load nodes db: %v", err)
+	}
+	var (
+		k8sClient kubernetes.Interface
+		minter    nodes.Minter
+	)
 	if os.Getenv("KUBERNETES_SERVICE_HOST") != "" || os.Getenv("KUBERNETES_IN_CLUSTER") == "true" {
 		namespace := os.Getenv("SESSION_NAMESPACE")
 		if namespace == "" {
@@ -39,8 +55,18 @@ func main() {
 			log.Fatalf("configure Kubernetes session provisioner: %v", err)
 		}
 		sessionStore = sessions.NewStoreWithProvisioner(provisioner)
+		config, err := rest.InClusterConfig()
+		if err != nil {
+			log.Fatalf("load in-cluster Kubernetes config: %v", err)
+		}
+		k8sClient, err = kubernetes.NewForConfig(config)
+		if err != nil {
+			log.Fatalf("create Kubernetes client: %v", err)
+		}
+		minter = nodes.NewBootstrapMinter(k8sClient)
+		go nodes.NewWatcher(nodeStore, k8sClient, 5*time.Second).Run(context.Background())
 	}
-	apiHandler := httpapi.NewRouter(authSvc, sessionStore)
+	apiHandler := httpapi.NewRouterWithNodes(authSvc, sessionStore, nodeStore, minter)
 	gatewayHandler := gateway.NewSessionHandler(authSvc, sessionStore, apiHandler)
 
 	server := &http.Server{

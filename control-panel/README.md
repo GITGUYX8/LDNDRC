@@ -63,6 +63,33 @@ Expected health response:
 {"status":"ok"}
 ```
 
+## Host onboarding (nodes API)
+
+Laptops register join requests; an operator approves them and the laptop
+polls until it receives a short-lived K3s bootstrap token:
+
+```bash
+# laptop → register (unauthenticated, rate-limited, optional JOIN_KEY)
+curl -X POST http://127.0.0.1:8082/api/nodes/register \
+  -H 'Content-Type: application/json' \
+  -d '{"hostname":"laptop-a","os":"linux","arch":"amd64","cpu":12,"ram_gb":32,"gpu":"NVIDIA RTX"}'
+# → {"id":"<id>","status":"pending"}
+
+# operator → approve (JWT from /api/auth/login)
+curl -X POST http://127.0.0.1:8082/api/nodes/<id>/approve \
+  -H "Authorization: Bearer $TOKEN"
+
+# laptop → poll until approved; first poll mints the token (once)
+curl http://127.0.0.1:8082/api/nodes/<id>
+# → {"status":"approved","k3s_url":"...","k3s_token":"K10...","node_name":"ldndrc-<id>"}
+```
+
+Requires the nodes RBAC (`control-panel-rbac.yaml`), the `NODES_DB` volume,
+and `K3S_JOIN_URL` set to the master's reachable address
+(e.g. `https://192.168.1.50:6443`) — without it, approved polls mint the
+token but answer 503. A 5s watcher labels Ready nodes `role=host` and marks
+them `joined`.
+
 The session image must already be available to the K3s nodes. A session stays
 in `provisioning` until its Deployment reports an available replica, at which
 point the store promotes it to `ready` and the gateway starts routing to it.

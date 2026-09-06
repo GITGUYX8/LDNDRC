@@ -33,6 +33,66 @@ rules:
     resources: ["pods"]
     verbs: ["get", "list", "watch"]
 ---
+# Nodes onboarding (P1): the control panel mints bootstrap tokens in
+# kube-system and labels joined nodes. No access to any other resource.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: ldndrc-control-panel-nodes
+  namespace: kube-system
+  labels:
+    app.kubernetes.io/name: ldndrc-control-panel
+    app.kubernetes.io/part-of: ldndrc
+rules:
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get", "create", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: ldndrc-control-panel-nodes
+  namespace: kube-system
+  labels:
+    app.kubernetes.io/name: ldndrc-control-panel
+    app.kubernetes.io/part-of: ldndrc
+subjects:
+  - kind: ServiceAccount
+    name: ldndrc-control-panel
+    namespace: ldndrc
+roleRef:
+  kind: Role
+  name: ldndrc-control-panel-nodes
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: ldndrc-control-panel-nodes
+  labels:
+    app.kubernetes.io/name: ldndrc-control-panel
+    app.kubernetes.io/part-of: ldndrc
+rules:
+  - apiGroups: [""]
+    resources: ["nodes"]
+    verbs: ["get", "list", "watch", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: ldndrc-control-panel-nodes
+  labels:
+    app.kubernetes.io/name: ldndrc-control-panel
+    app.kubernetes.io/part-of: ldndrc
+subjects:
+  - kind: ServiceAccount
+    name: ldndrc-control-panel
+    namespace: ldndrc
+roleRef:
+  kind: ClusterRole
+  name: ldndrc-control-panel-nodes
+  apiGroup: rbac.authorization.k8s.io
+---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:

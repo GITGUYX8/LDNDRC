@@ -61,11 +61,22 @@ spec:
             # Hosts use "1".
             - name: SESSION_GPU_LIMIT
               value: "0"
+            # Nodes onboarding DB (P1): emptyDir survives container restarts;
+            # a PVC or the shared R2 persistence solution replaces it later.
+            - name: NODES_DB
+              value: /var/lib/ldndrc/nodes.json
+            # Public K3s join URL handed to approved laptops. Set this to the
+            # master's LAN address, e.g. https://192.168.1.50:6443.
+            - name: K3S_JOIN_URL
+              value: ""
             - name: CONTROL_PANEL_PORT
               value: "8082"
           ports:
             - name: http
               containerPort: 8082
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/ldndrc
           readinessProbe:
             httpGet:
               path: /healthz
@@ -88,3 +99,6 @@ spec:
             limits:
               cpu: 250m
               memory: 256Mi
+      volumes:
+        - name: data
+          emptyDir: {}
