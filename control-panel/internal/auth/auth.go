@@ -7,6 +7,9 @@ package auth
 
 import (
 	"errors"
+	"net/http"
+	"os"
+	"strings"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -59,4 +62,52 @@ func (s *Service) Verify(tokenString string) (*Claims, error) {
 		return nil, errors.New("invalid token")
 	}
 	return claims, nil
+}
+
+// CookieName returns the browser session cookie name.
+func (s *Service) CookieName() string {
+	if name := os.Getenv("SESSION_COOKIE_NAME"); name != "" {
+		return name
+	}
+	return "ldndrc_session"
+}
+
+// SetSessionCookie writes the JWT as an HttpOnly cookie for browser tools.
+func (s *Service) SetSessionCookie(w http.ResponseWriter, token string) {
+	maxAge := int(s.ttl.Seconds())
+	cookie := &http.Cookie{
+		Name:     s.CookieName(),
+		Value:    token,
+		Path:     "/",
+		MaxAge:   maxAge,
+		HttpOnly: true,
+		SameSite: http.SameSiteLaxMode,
+		Secure:   os.Getenv("COOKIE_SECURE") == "true",
+	}
+	if domain := os.Getenv("COOKIE_DOMAIN"); domain != "" {
+		cookie.Domain = domain
+	}
+	http.SetCookie(w, cookie)
+}
+
+// ClearSessionCookie removes the browser session cookie.
+func (s *Service) ClearSessionCookie(w http.ResponseWriter) {
+	http.SetCookie(w, &http.Cookie{
+		Name:     s.CookieName(),
+		Value:    "",
+		Path:     "/",
+		MaxAge:   -1,
+		HttpOnly: true,
+		SameSite: http.SameSiteLaxMode,
+		Secure:   os.Getenv("COOKIE_SECURE") == "true",
+	})
+}
+
+// VerifyCookie authenticates the configured session cookie from a request.
+func (s *Service) VerifyCookie(r *http.Request) (*Claims, error) {
+	cookie, err := r.Cookie(s.CookieName())
+	if err != nil || strings.TrimSpace(cookie.Value) == "" {
+		return nil, errors.New("session cookie missing")
+	}
+	return s.Verify(cookie.Value)
 }

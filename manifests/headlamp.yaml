@@ -1,0 +1,144 @@
+# Headlamp: in-cluster Kubernetes dashboard for LDNDRC.
+#
+# Adapted from the reference project's headlamp-template.yaml, renamed to
+# LDNDRC conventions (ldndrc namespace, ldndrc-headlamp names).
+#
+# Access model: NO ingress. Headlamp is reached via
+#   kubectl -n ldndrc port-forward svc/ldndrc-headlamp 8080:80
+# and login uses a ServiceAccount bearer token:
+#   kubectl -n ldndrc create token ldndrc-headlamp --duration=24h
+#
+# The ClusterRole is read-only (get/list/watch) plus the self-review verbs
+# Headlamp needs for its RBAC-aware UI. Acceptable for this local dev
+# cluster; narrow before any shared deployment.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: ldndrc-headlamp
+  namespace: ldndrc
+  labels:
+    app.kubernetes.io/name: ldndrc-headlamp
+    app.kubernetes.io/part-of: ldndrc
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: ldndrc-headlamp
+  labels:
+    app.kubernetes.io/name: ldndrc-headlamp
+    app.kubernetes.io/part-of: ldndrc
+rules:
+  - apiGroups: ["*"]
+    resources: ["*"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["authorization.k8s.io"]
+    resources: ["selfsubjectaccessreviews", "selfsubjectrulesreviews"]
+    verbs: ["create"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: ldndrc-headlamp
+  labels:
+    app.kubernetes.io/name: ldndrc-headlamp
+    app.kubernetes.io/part-of: ldndrc
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: ldndrc-headlamp
+subjects:
+  - kind: ServiceAccount
+    name: ldndrc-headlamp
+    namespace: ldndrc
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ldndrc-headlamp
+  namespace: ldndrc
+  labels:
+    app.kubernetes.io/name: ldndrc-headlamp
+    app.kubernetes.io/part-of: ldndrc
+spec:
+  replicas: 1
+  revisionHistoryLimit: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: ldndrc-headlamp
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: ldndrc-headlamp
+        app.kubernetes.io/part-of: ldndrc
+    spec:
+      serviceAccountName: ldndrc-headlamp
+      automountServiceAccountToken: true
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: headlamp
+          image: ghcr.io/headlamp-k8s/headlamp:latest
+          imagePullPolicy: IfNotPresent
+          args:
+            - "-in-cluster"
+            - "-in-cluster-context-name=main"
+            - "-enable-dynamic-clusters"
+          env:
+            - name: HOME
+              value: /tmp/headlamp
+            - name: XDG_CONFIG_HOME
+              value: /tmp/headlamp/.config
+            - name: XDG_CACHE_HOME
+              value: /tmp/headlamp/.cache
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            runAsUser: 100
+            runAsGroup: 101
+            privileged: false
+            capabilities:
+              drop: ["ALL"]
+          ports:
+            - name: http
+              containerPort: 4466
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+            periodSeconds: 15
+            timeoutSeconds: 5
+            failureThreshold: 6
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+---
+# No ingress here: access is via port-forward only. Nothing is exposed
+# to the LAN.
+apiVersion: v1
+kind: Service
+metadata:
+  name: ldndrc-headlamp
+  namespace: ldndrc
+  labels:
+    app.kubernetes.io/name: ldndrc-headlamp
+    app.kubernetes.io/part-of: ldndrc
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: ldndrc-headlamp
+  ports:
+    - name: http
+      port: 80
+      targetPort: http

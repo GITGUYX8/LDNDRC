@@ -1,0 +1,104 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ldndrc-control-panel
+  namespace: ldndrc
+  labels:
+    app.kubernetes.io/name: ldndrc-control-panel
+    app.kubernetes.io/part-of: ldndrc
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: ldndrc-control-panel
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: ldndrc-control-panel
+        app.kubernetes.io/part-of: ldndrc
+    spec:
+      serviceAccountName: ldndrc-control-panel
+      automountServiceAccountToken: true
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: control-panel
+          image: ldndrc/control-panel:dev
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          env:
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: ldndrc-control-panel
+                  key: JWT_SECRET
+            - name: KUBERNETES_IN_CLUSTER
+              value: "true"
+            - name: SESSION_NAMESPACE
+              value: ldndrc
+            - name: COOKIE_DOMAIN
+              value: .ros-platform.local
+            - name: GATEWAY_HOST_SUFFIX
+              value: ros-platform.local
+            # Demo-cluster value: tiny stand-in HTTP server so sessions can
+            # reach `ready` and the gateway path is verifiable without the
+            # full Jazzy/Harmonic workspace image. Production uses
+            # ldndrc/ros2-gz:jazzy-harmonic-workspace.
+            - name: SESSION_IMAGE
+              value: ldndrc/demo-standin:dev
+            - name: SESSION_HOME_STORAGE
+              value: 5Gi
+            # Demo-cluster value: the k3d node has no GPU, so sessions omit
+            # the nvidia.com/gpu request and can schedule. Production
+            # Hosts use "1".
+            - name: SESSION_GPU_LIMIT
+              value: "0"
+            # Nodes onboarding DB (P1): emptyDir survives container restarts;
+            # a PVC or the shared R2 persistence solution replaces it later.
+            - name: NODES_DB
+              value: /var/lib/ldndrc/nodes.json
+            # Public K3s join URL handed to approved laptops. Set this to the
+            # master's LAN address, e.g. https://192.168.1.50:6443.
+            - name: K3S_JOIN_URL
+              value: ""
+            - name: CONTROL_PANEL_PORT
+              value: "8082"
+          ports:
+            - name: http
+              containerPort: 8082
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/ldndrc
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 3
+            periodSeconds: 5
+            timeoutSeconds: 2
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 2
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 250m
+              memory: 256Mi
+      volumes:
+        - name: data
+          emptyDir: {}

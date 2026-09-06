@@ -1,42 +1,252 @@
-// Package sessions manages workspace pods via the Kubernetes client-go API.
-//
-// This is the Go equivalent of the reference control panel's
-// kubernetes.service.ts: it provisions a session pod, reports status, and
-// tears pods down. The client-go wiring is intentionally isolated here so the
-// rest of the server compiles and runs without a cluster (the store seam in
-// internal/httpapi stays nil until a kubeconfig is provided).
-//
-// TODO(sessions): wire k8s.io/client-go once the ros2-platform StatefulSet
-// manifest (Task 5) is final. Provision will create the per-user pod from
-// that manifest template and return the pod endpoint for the gateway.
+// Package sessions owns the control-plane session contract. Kubernetes
+// provisioning is deliberately behind the Provisioner seam so this package
+// can be tested without a cluster.
 package sessions
 
-// Store provisions and reports Kubernetes workspace sessions.
+import (
+	"crypto/rand"
+	"errors"
+	"fmt"
+	"sync"
+	"time"
+)
+
+type Status string
+
+const (
+	StatusProvisioning Status = "provisioning"
+	StatusReady        Status = "ready"
+	StatusStopping     Status = "stopping"
+	StatusStopped      Status = "stopped"
+	StatusError        Status = "error"
+)
+
+// Session identifies one private workspace owned by one user.
+type Session struct {
+	ID           string    `json:"id"`
+	Username     string    `json:"username"`
+	WorkloadName string    `json:"workloadName"`
+	ServiceName  string    `json:"serviceName"`
+	RosDomainID  int       `json:"rosDomainId"`
+	Status       Status    `json:"status"`
+	NodeName     string    `json:"nodeName,omitempty"`
+	Error        string    `json:"error,omitempty"`
+	CreatedAt    time.Time `json:"createdAt"`
+	UpdatedAt    time.Time `json:"updatedAt"`
+}
+
+var (
+	ErrSessionExists = errors.New("user already has an active session")
+	ErrNotFound      = errors.New("session not found")
+	ErrForbidden     = errors.New("session does not belong to user")
+	ErrInvalidStatus = errors.New("invalid session status transition")
+)
+
+// Provisioner creates and removes the Kubernetes resources for a session.
+type Provisioner interface {
+	Apply(Session) error
+	Delete(Session) error
+}
+
+// StatusProvider lets a Kubernetes-backed provisioner reconcile workload
+// readiness before the gateway accepts browser traffic.
+type StatusProvider interface {
+	Ready(Session) (bool, error)
+}
+
+// Store tracks session ownership and lifecycle. The default store is
+// in-memory; production persistence can be added without changing the API.
 type Store struct {
-	// kubeconfigPath is empty when running without a cluster.
-	kubeconfigPath string
+	mu          sync.RWMutex
+	sessions    map[string]Session
+	byUser      map[string]string
+	provisioner Provisioner
 }
 
-// NewStore returns a Store. Pass an empty kubeconfigPath to run in
-// "no cluster" mode (provisioning returns ErrNoCluster).
-func NewStore(kubeconfigPath string) *Store {
-	return &Store{kubeconfigPath: kubeconfigPath}
+func NewStore() *Store {
+	return NewStoreWithProvisioner(nil)
 }
 
-// ErrNoCluster is returned when Provision is called without a kubeconfig.
-var ErrNoCluster = errNoCluster{}
-
-type errNoCluster struct{}
-
-func (errNoCluster) Error() string { return "no kubeconfig configured" }
-
-// Provision creates a workspace for username.
-func (s *Store) Provision(username string) error {
-	if s.kubeconfigPath == "" {
-		return ErrNoCluster
+func NewStoreWithProvisioner(provisioner Provisioner) *Store {
+	return &Store{
+		sessions:    make(map[string]Session),
+		byUser:      make(map[string]string),
+		provisioner: provisioner,
 	}
-	// TODO(sessions): create the pod from the ros2-platform template and
-	// register its endpoint for the gateway's resolve func.
-	_ = username
-	return nil
+}
+
+func (s *Store) Create(username string) (Session, error) {
+	if username == "" {
+		return Session{}, errors.New("username is required")
+	}
+
+	s.mu.Lock()
+	if id, ok := s.byUser[username]; ok {
+		existing := s.sessions[id]
+		if existing.Status != StatusStopped && existing.Status != StatusError {
+			s.mu.Unlock()
+			return Session{}, ErrSessionExists
+		}
+	}
+	id, err := newID()
+	if err != nil {
+		s.mu.Unlock()
+		return Session{}, fmt.Errorf("generate session id: %w", err)
+	}
+	domainID, err := s.nextDomainIDLocked()
+	if err != nil {
+		s.mu.Unlock()
+		return Session{}, err
+	}
+	now := time.Now().UTC()
+	session := Session{
+		ID:           id,
+		Username:     username,
+		WorkloadName: "ros2-session-" + id,
+		ServiceName:  "ros2-session-" + id,
+		RosDomainID:  domainID,
+		Status:       StatusProvisioning,
+		CreatedAt:    now,
+		UpdatedAt:    now,
+	}
+	s.sessions[id] = session
+	s.byUser[username] = id
+	provisioner := s.provisioner
+	s.mu.Unlock()
+
+	if provisioner != nil {
+		if err := provisioner.Apply(session); err != nil {
+			_, _ = s.setStatus(username, id, StatusError, err.Error())
+			return Session{}, fmt.Errorf("provision session: %w", err)
+		}
+	}
+	return session, nil
+}
+
+func (s *Store) List(username string) []Session {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	id, ok := s.byUser[username]
+	if !ok {
+		return []Session{}
+	}
+	return []Session{s.sessions[id]}
+}
+
+func (s *Store) Get(username, id string) (Session, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	session, ok := s.sessions[id]
+	if !ok {
+		return Session{}, ErrNotFound
+	}
+	if session.Username != username {
+		return Session{}, ErrForbidden
+	}
+	return session, nil
+}
+
+// Current returns the authenticated user's active session.
+func (s *Store) Current(username string) (Session, error) {
+	s.mu.RLock()
+	id, ok := s.byUser[username]
+	if !ok {
+		s.mu.RUnlock()
+		return Session{}, ErrNotFound
+	}
+	session := s.sessions[id]
+	provisioner := s.provisioner
+	s.mu.RUnlock()
+	if statusProvider, ok := provisioner.(StatusProvider); ok && session.Status == StatusProvisioning {
+		ready, err := statusProvider.Ready(session)
+		if err != nil {
+			return Session{}, fmt.Errorf("check session readiness: %w", err)
+		}
+		if ready {
+			session, err = s.setStatus(username, id, StatusReady, "")
+			if err != nil {
+				return Session{}, err
+			}
+		}
+	}
+	if session.Status == StatusStopped || session.Status == StatusError {
+		return Session{}, ErrNotFound
+	}
+	return session, nil
+}
+
+func (s *Store) SetStatus(username, id string, status Status, message string) (Session, error) {
+	return s.setStatus(username, id, status, message)
+}
+
+func (s *Store) setStatus(username, id string, status Status, message string) (Session, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	session, ok := s.sessions[id]
+	if !ok {
+		return Session{}, ErrNotFound
+	}
+	if session.Username != username {
+		return Session{}, ErrForbidden
+	}
+	if !validTransition(session.Status, status) {
+		return Session{}, fmt.Errorf("%w: %s -> %s", ErrInvalidStatus, session.Status, status)
+	}
+	session.Status = status
+	session.Error = message
+	session.UpdatedAt = time.Now().UTC()
+	s.sessions[id] = session
+	return session, nil
+}
+
+func (s *Store) Delete(username, id string) (Session, error) {
+	session, err := s.Get(username, id)
+	if err != nil {
+		return Session{}, err
+	}
+	if session.Status == StatusStopped {
+		return session, nil
+	}
+	if s.provisioner != nil {
+		if err := s.provisioner.Delete(session); err != nil {
+			return Session{}, fmt.Errorf("delete session: %w", err)
+		}
+	}
+	return s.setStatus(username, id, StatusStopped, "")
+}
+
+func (s *Store) nextDomainIDLocked() (int, error) {
+	used := make(map[int]bool)
+	for _, session := range s.sessions {
+		if session.Status != StatusStopped && session.Status != StatusError {
+			used[session.RosDomainID] = true
+		}
+	}
+	for id := 100; id <= 232; id++ {
+		if !used[id] {
+			return id, nil
+		}
+	}
+	return 0, errors.New("no ROS domain IDs available")
+}
+
+func validTransition(from, to Status) bool {
+	switch from {
+	case StatusProvisioning:
+		return to == StatusReady || to == StatusError || to == StatusStopping || to == StatusStopped
+	case StatusReady:
+		return to == StatusStopping || to == StatusError || to == StatusStopped
+	case StatusStopping:
+		return to == StatusStopped || to == StatusError
+	default:
+		return false
+	}
+}
+
+func newID() (string, error) {
+	var bytes [6]byte
+	if _, err := rand.Read(bytes[:]); err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("%x", bytes), nil
 }
