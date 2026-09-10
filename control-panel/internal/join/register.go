@@ -108,6 +108,26 @@ func (c *Client) WaitApproval(ctx context.Context, id string, timeout time.Durat
 	}
 }
 
+// WaitJoined polls until the watcher marks the node joined (Ready +
+// labeled in the cluster) or the timeout elapses.
+func (c *Client) WaitJoined(ctx context.Context, id string, timeout time.Duration) error {
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+	t := time.NewTicker(5 * time.Second)
+	defer t.Stop()
+	for {
+		res, err := c.Poll(ctx, id)
+		if err == nil && res.Status == "joined" {
+			return nil
+		}
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf("join confirm timed out")
+		case <-t.C:
+		}
+	}
+}
+
 // UploadDiagnostics posts a bundle file; the server caps it at 1MB.
 func (c *Client) UploadDiagnostics(ctx context.Context, id string, bundle []byte) error {
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost,

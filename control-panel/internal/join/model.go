@@ -15,6 +15,7 @@ type Screen int
 const (
 	ScreenChecks Screen = iota
 	ScreenFix
+	ScreenConfirm
 	ScreenJoin
 	ScreenDone
 )
@@ -34,7 +35,15 @@ type Model struct {
 	StepLog  []string
 	DoneMsg  string
 	Master   string
-	quitting bool
+	// NeedToolkit requests the consent prompt before joining (D4): the
+	// toolkit install never runs silently.
+	NeedToolkit bool
+	// PendingPrompt is shown on ScreenConfirm.
+	PendingPrompt string
+	// JoinStarted marks the flow launched; the cmd/join glue watches this
+	// transition to start the engine goroutine exactly once.
+	JoinStarted bool
+	quitting    bool
 }
 
 var (
@@ -95,10 +104,24 @@ func (m Model) handleKey(key string) Model {
 		if key == "enter" && hasRed {
 			m.Screen = ScreenFix
 		} else if key == "j" && !hasRed {
-			m.Screen = ScreenJoin
+			if m.NeedToolkit {
+				m.PendingPrompt = "Install the NVIDIA container toolkit now? (needs sudo)  [y/N]"
+				m.Screen = ScreenConfirm
+			} else {
+				m.Screen = ScreenJoin
+				m.JoinStarted = true
+			}
 		}
 	case ScreenFix:
 		if key == "esc" || key == "backspace" {
+			m.Screen = ScreenChecks
+		}
+	case ScreenConfirm:
+		switch key {
+		case "y", "Y":
+			m.Screen = ScreenJoin
+			m.JoinStarted = true
+		case "n", "N", "esc":
 			m.Screen = ScreenChecks
 		}
 	case ScreenJoin:
@@ -137,6 +160,9 @@ func (m Model) View() string {
 		sb.WriteString(redStyle.Render("Fix: "+r.Name) + "\n")
 		sb.WriteString(r.Detail + "\n")
 		sb.WriteString("\n[esc: back]\n")
+	case ScreenConfirm:
+		sb.WriteString(amberStyle.Render("Confirm") + "\n")
+		sb.WriteString(m.PendingPrompt + "\n")
 	case ScreenJoin:
 		sb.WriteString("Joining via master " + m.Master + ":\n")
 		for _, s := range m.StepLog {
