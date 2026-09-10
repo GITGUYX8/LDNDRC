@@ -8,12 +8,20 @@
 #
 #   MASTER_IP=192.168.1.37 ./acceptance-second-laptop.sh
 #
-# Env knobs: MASTER_IP (default below), VERSION (default v0.2.0),
-# FLAVOR (default linux-amd64; linux-arm64, darwin-amd64, darwin-arm64,
+# Env knobs: MASTER_IP (REQUIRED — no default: Wi-Fi subnets change, and a
+# stale default fails confusingly), VERSION (default v0.2.0), FLAVOR
+# (default linux-amd64; linux-arm64, darwin-amd64, darwin-arm64,
 # windows-amd64.exe also published).
 set -euo pipefail
 
-MASTER_IP="${MASTER_IP:-192.168.1.37}"
+if [ -z "${MASTER_IP:-}" ]; then
+    echo "[acceptance] MASTER_IP is required." >&2
+    echo "Find the master's LAN IP on the master laptop with:" >&2
+    echo "  ip -4 addr show scope global | grep inet" >&2
+    echo "Then re-run with both laptops on the same Wi-Fi:" >&2
+    echo "  MASTER_IP=<master-lan-ip> ./acceptance-second-laptop.sh" >&2
+    exit 2
+fi
 VERSION="${VERSION:-v0.2.0}"
 FLAVOR="${FLAVOR:-linux-amd64}"
 ASSET="ldndrc-join-${FLAVOR}"
