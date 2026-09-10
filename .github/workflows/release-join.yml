@@ -1,0 +1,66 @@
+# Release ldndrc-join binaries on version tags (v*).
+#
+# Builds the static join binary for Linux, Windows, and macOS (amd64+arm64),
+# publishes SHA256 checksums, and attaches everything to a GitHub Release.
+# No GoReleaser: plain Actions keeps the zero-budget constraint.
+name: release-join
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: control-panel
+    strategy:
+      matrix:
+        include:
+          - goos: linux
+            goarch: amd64
+            asset: ldndrc-join-linux-amd64
+          - goos: linux
+            goarch: arm64
+            asset: ldndrc-join-linux-arm64
+          - goos: windows
+            goarch: amd64
+            asset: ldndrc-join-windows-amd64.exe
+          - goos: darwin
+            goarch: amd64
+            asset: ldndrc-join-darwin-amd64
+          - goos: darwin
+            goarch: arm64
+            asset: ldndrc-join-darwin-arm64
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: control-panel/go.mod
+          cache-dependency-path: control-panel/go.sum
+      - run: go vet ./...
+      - run: go test ./...
+      - run: GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} CGO_ENABLED=0 go build -trimpath -o ${{ matrix.asset }} ./cmd/join
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.asset }}
+          path: control-panel/${{ matrix.asset }}
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - run: cd dist && sha256sum * > SHA256SUMS && cat SHA256SUMS
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+          generate_release_notes: true
