@@ -42,9 +42,18 @@ This document locks the UX decisions agreed 2026-09-06.
 ## Distribution (the chicken-and-egg)
 
 The binary cannot be downloaded from a master it hasn't discovered yet.
-v1 channels: GitHub Release artifacts (`ldndrc-join-linux`,
-`ldndrc-join.exe` + checksums) and workshop USB sticks. No installer —
-the joiner itself needs zero installation; it runs from anywhere.
+Primary channel: GitHub Release artifacts (linux/windows/darwin,
+amd64+arm64, plus `SHA256SUMS`), built by `.github/workflows/release-join.yml`
+on every `v*` tag. Fallback: workshop USB sticks. Verify before running:
+
+```bash
+curl -sSL https://github.com/GITGUYX8/LDNDRC/releases/download/v0.1.0/ldndrc-join-linux-amd64 -o ldndrc-join-linux-amd64
+curl -sSL https://github.com/GITGUYX8/LDNDRC/releases/download/v0.1.0/SHA256SUMS -o SHA256SUMS
+sha256sum -c SHA256SUMS --ignore-missing   # keep the release filename or verification finds nothing
+chmod +x ldndrc-join-linux-amd64
+```
+
+No installer — the joiner itself needs zero installation; it runs from anywhere.
 
 ## Pre-flight check matrix (Screen 1, read-only)
 
