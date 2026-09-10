@@ -13,6 +13,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"sync"
@@ -223,6 +224,38 @@ func (s *Store) ExpireIfElapsed(id string, now time.Time) (bool, error) {
 		return true, s.saveLocked()
 	}
 	return false, nil
+}
+
+// MaxDiagnosticsBytes caps uploaded bundles (1MB — text only).
+const MaxDiagnosticsBytes = 1 << 20
+
+// SaveDiagnostics stores a laptop-uploaded diagnostics bundle next to the
+// DB. Bundles contain no secrets by construction (the join binary excludes
+// tokens), so file permissions mirror the DB file.
+func (s *Store) SaveDiagnostics(id string, r io.Reader) error {
+	s.mu.RLock()
+	_, ok := s.nodes[id]
+	s.mu.RUnlock()
+	if !ok {
+		return ErrNotFound
+	}
+	if err := os.MkdirAll(filepath.Dir(s.path), 0o755); err != nil {
+		return err
+	}
+	tmp, err := os.CreateTemp(filepath.Dir(s.path), "diag-*.tmp")
+	if err != nil {
+		return err
+	}
+	tmpName := tmp.Name()
+	defer os.Remove(tmpName)
+	if _, err := io.Copy(tmp, r); err != nil {
+		tmp.Close()
+		return err
+	}
+	if err := tmp.Close(); err != nil {
+		return err
+	}
+	return os.Rename(tmpName, filepath.Join(filepath.Dir(s.path), id+".diagnostics.txt"))
 }
 
 func (s *Store) saveLocked() error {

@@ -84,7 +84,7 @@ discovery" in the project's name real.
 ### 3.2 Non-goals (this iteration)
 
 - **N1.** No rehearsal/simulation harness (`machinesim`) — production mechanism only.
-- **N2.** No automatic NVIDIA **driver** install — toolkit only; missing driver = clear error.
+- **N2.** No **silent** NVIDIA **driver** install — the joiner may offer an explicit, two-consent driver download → install flow (detection is read-only; download starts only on the user's explicit Download activation; install needs a second confirmation — see §7.1a and `docs/host-joiner-tui-spec.md` decision 4). Anything less than explicit per-step consent falls back to toolkit-only with a clear missing-driver error.
 - **N3.** No TLS on the control panel API — LAN trust assumed; flagged for later hardening.
 - **N4.** No automatic WSL2 installation on Windows — guided handoff only (requires admin + reboot).
 - **N5.** (Moot since checkpoint-13 — the `ros2-*.yaml` manifests are deleted.) Onboarding stays orthogonal to the session workloads regardless.
@@ -159,7 +159,8 @@ During plan review, five defects in earlier drafts were found and fixed:
  │ 6. on approved: receive     │◄──④ token─── │     frontend; curl until then)   │
  │    {k3s_url, k3s_token,     │              │  D. lazy mint: create            │
  │     node_name}              │              │     bootstrap-token Secret in    │
- │ 7. install toolkit (if GPU) │              │     kube-system, TTL 15m         │
+ │ 7. toolkit if GPU, consent   │              │     kube-system, TTL 15m         │
+ │    first (never silent)       │              │                                  │
  │ 8. install k3s agent        │──⑤ 6443────► │                                  │
  │    --node-name ldndrc-<id>  │   k3s API    │  E. watcher: client-go nodes     │
  │ 9. poll until status=joined │──⑥ poll────► │     watch → label role=host →    │
@@ -329,6 +330,9 @@ and the gateway; nodes join the same binary behind the same JWT.
 
 One static Go binary per platform, built from `control-panel/cmd/join/`
 (same module — shares `hashicorp/mdns`; the linker strips the rest).
+Laptop-side UX — screens, pre-flight matrix, consent flows, diagnostics —
+is specified in `docs/host-joiner-tui-spec.md` (terminal UI, zero budget);
+this section defines the protocol steps that UX drives.
 
 ### 7.1 Execution flow
 
@@ -344,7 +348,12 @@ ldndrc-join
   │     CPU: runtime.NumCPU()
   │     RAM: linux /proc/meminfo · windows GlobalMemoryStatusEx · darwin sysctl hw.memsize
   │     GPU: exec `nvidia-smi -L`  (works on Linux, Windows, and inside WSL2)
-  │     thresholds unchanged: ≥8 cores, ≥16 GB, NVIDIA present  → else guest mode
+  │     Driver: parse `nvidia-smi` version → red <535, amber 535–549 (550+ recommended), green ≥550
+  │     Disk: free space on `/` → ≥25 GB (agent + first workload pull + headroom)
+  │     Sudo + master:6443 reachability → required (exact `ufw allow` lines on failure)
+  │     thresholds: ≥8 cores, ≥16 GB, NVIDIA present, driver ≥535, disk + sudo + network green
+  │       → else guest mode (browser URL, nothing installed, exit 0); no override
+  │     full matrix: docs/host-joiner-tui-spec.md
   │
   ├─ 3. Discover master
   │     browse _ldndrc-master._tcp via hashicorp/mdns client (≈3s timeout)
@@ -372,6 +381,17 @@ ldndrc-join
   │
   └─ 10. Print success, URLs, and removal note (k3s-uninstall.sh)
 ```
+
+### 7.1a Diagnostics bundle + network-gated auto-upload
+
+Any failure offers a diagnostics export writing
+`ldndrc-diagnostics-<timestamp>.txt` (OS, check outputs, step log;
+tokens/secrets excluded by construction). The approval-poll loop doubles
+as the network health probe: polls succeeding → auto-upload the bundle to
+the master; polls failing → skip auto-upload and tell the student to share
+the local file manually, with the exact filename. The local file is always
+written first, so the manual path never depends on the network. Full UX in
+`docs/host-joiner-tui-spec.md` (locked decision 3).
 
 ### 7.2 Windows specifics (decision 4.6)
 
@@ -439,6 +459,7 @@ task**, not code.
 | Token in transit over HTTP | Accepted for v1 (LAN); TLS/mTLS listed as future hardening (N3) |
 | Hostname collisions | Deterministic `--node-name ldndrc-<id>`; idempotent register keyed on hostname+fingerprint |
 | Dashboard access | Existing JWT auth (`internal/auth`) guards operator endpoints |
+| Diagnostics bundle exposes host fingerprints | Bundle excludes tokens/secrets by construction; auto-upload only over a proven-healthy poll path, manual file share otherwise |
 | Privilege scope of minter | Narrow RBAC (bootstrap-token secrets in `kube-system`, label-only node patch) instead of root — no all-powerful static token anywhere |
 
 ---

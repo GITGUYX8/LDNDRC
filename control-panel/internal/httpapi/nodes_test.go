@@ -106,6 +106,33 @@ func TestNodesRegisterApprovePollFlow(t *testing.T) {
 	}
 }
 
+func TestNodesDiagnosticsUpload(t *testing.T) {
+	handler, _ := nodesHandler(t, &fakeMinter{})
+
+	reg := postNodeJSON(t, handler, http.MethodPost, "/api/nodes/register", "",
+		`{"hostname":"laptop-d","os":"linux","arch":"amd64","cpu":12,"ram_gb":32}`)
+	var regBody struct {
+		ID string `json:"id"`
+	}
+	if err := json.NewDecoder(reg.Body).Decode(&regBody); err != nil {
+		t.Fatal(err)
+	}
+	up := postNodeJSON(t, handler, http.MethodPost, "/api/nodes/"+regBody.ID+"/diagnostics", "",
+		"OS: linux\nchecks: ok\n")
+	if up.Code != http.StatusCreated {
+		t.Fatalf("upload status = %d: %s", up.Code, up.Body.String())
+	}
+	missing := postNodeJSON(t, handler, http.MethodPost, "/api/nodes/doesnotexist/diagnostics", "", "x")
+	if missing.Code != http.StatusNotFound {
+		t.Fatalf("unknown id status = %d, want 404", missing.Code)
+	}
+	big := postNodeJSON(t, handler, http.MethodPost, "/api/nodes/"+regBody.ID+"/diagnostics", "",
+		strings.Repeat("x", nodes.MaxDiagnosticsBytes+1))
+	if big.Code != http.StatusRequestEntityTooLarge {
+		t.Fatalf("oversize status = %d, want 413", big.Code)
+	}
+}
+
 func TestNodesDenyAndUnknown(t *testing.T) {
 	handler, _ := nodesHandler(t, &fakeMinter{})
 	authService := auth.NewService([]byte("test-secret"), time.Hour)

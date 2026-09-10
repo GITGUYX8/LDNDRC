@@ -259,6 +259,27 @@ func NewRouterWithNodes(authSvc *auth.Service, store sessionStore, nodeStore *no
 			}
 			writeJSON(w, http.StatusOK, map[string]any{"id": node.ID, "status": node.Status})
 		})
+
+		// Diagnostics upload from the joining laptop. Auth is knowledge of
+		// the node id (same model as the poll endpoint): bundles carry no
+		// secrets by construction, and the id is unguessable enough for LAN.
+		mux.HandleFunc("POST /api/nodes/{id}/diagnostics", func(w http.ResponseWriter, r *http.Request) {
+			r.Body = http.MaxBytesReader(w, r.Body, nodes.MaxDiagnosticsBytes)
+			if err := nodeStore.SaveDiagnostics(r.PathValue("id"), r.Body); err != nil {
+				if err == nodes.ErrNotFound {
+					writeJSON(w, http.StatusNotFound, map[string]string{"error": err.Error()})
+					return
+				}
+				if strings.Contains(err.Error(), "request body too large") {
+					writeJSON(w, http.StatusRequestEntityTooLarge, map[string]string{"error": "bundle exceeds 1MB"})
+					return
+				}
+				log.Printf("diagnostics save failed: %v", err)
+				writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "save failed"})
+				return
+			}
+			writeJSON(w, http.StatusCreated, map[string]string{"status": "received"})
+		})
 	}
 
 	return logRequests(mux)
