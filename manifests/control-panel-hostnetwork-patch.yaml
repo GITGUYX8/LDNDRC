@@ -1,0 +1,22 @@
+# Optional patch for REAL masters only — never apply on the k3d demo cluster.
+#
+# mDNS advertisement needs LAN multicast (224.0.0.251), which a pod network
+# namespace cannot reach. This patch puts the control panel on the host
+# network so `_ldndrc-master._tcp` announcements reach joining laptops.
+# Pair with ADVERTISE_MDNS=true (edit the Deployment env) and open UDP 5353:
+#
+#   kubectl apply -f manifests/control-panel-hostnetwork-patch.yaml
+#   # set ADVERTISE_MDNS=true in manifests/control-panel-deployment.yaml, re-apply
+#   sudo ufw allow 5353/udp
+#
+# Verify from a second laptop: avahi-browse -r _ldndrc-master._tcp
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ldndrc-control-panel
+  namespace: ldndrc
+spec:
+  template:
+    spec:
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet

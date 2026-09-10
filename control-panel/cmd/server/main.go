@@ -5,9 +5,11 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/ldndrc/control-panel/internal/auth"
+	"github.com/ldndrc/control-panel/internal/discovery"
 	"github.com/ldndrc/control-panel/internal/gateway"
 	"github.com/ldndrc/control-panel/internal/httpapi"
 	"github.com/ldndrc/control-panel/internal/nodes"
@@ -21,7 +23,6 @@ func main() {
 	if port == "" {
 		port = "8082"
 	}
-
 	jwtSecret := os.Getenv("JWT_SECRET")
 	if jwtSecret == "" {
 		log.Fatal("JWT_SECRET must be set")
@@ -66,6 +67,20 @@ func main() {
 		minter = nodes.NewBootstrapMinter(k8sClient)
 		go nodes.NewWatcher(nodeStore, k8sClient, 5*time.Second).Run(context.Background())
 	}
+	portNum, err := strconv.Atoi(port)
+	if err != nil {
+		log.Fatalf("invalid CONTROL_PANEL_PORT %q: %v", port, err)
+	}
+	if advertiseMDNS() {
+		adv, err := discovery.Start("", portNum, discovery.TXTRecords())
+		if err != nil {
+			// Discovery degrades to MASTER_IP fallback — never crash the
+			// control plane over mDNS (e.g. pod netns without multicast).
+			log.Printf("discovery: advertise unavailable, clients must use MASTER_IP: %v", err)
+		} else {
+			defer adv.Shutdown()
+		}
+	}
 	apiHandler := httpapi.NewRouterWithNodes(authSvc, sessionStore, nodeStore, minter)
 	gatewayHandler := gateway.NewSessionHandler(authSvc, sessionStore, apiHandler)
 
@@ -79,4 +94,15 @@ func main() {
 	if err := server.ListenAndServe(); err != nil {
 		log.Fatal(err)
 	}
+}
+
+// advertiseMDNS reports whether to announce on the LAN. Default true per
+// the onboarding report; the k3d demo manifest sets false because a pod
+// network namespace cannot reach LAN multicast anyway.
+func advertiseMDNS() bool {
+	v, ok := os.LookupEnv("ADVERTISE_MDNS")
+	if !ok {
+		return true
+	}
+	return v == "true" || v == "1"
 }
