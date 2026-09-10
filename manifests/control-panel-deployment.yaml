@@ -69,6 +69,11 @@ spec:
             # master's LAN address, e.g. https://192.168.1.50:6443.
             - name: K3S_JOIN_URL
               value: ""
+            # Off here: a pod network namespace cannot reach LAN multicast,
+            # so advertising would only log noise. Real masters apply
+            # control-panel-hostnetwork-patch.yaml and set this to "true".
+            - name: ADVERTISE_MDNS
+              value: "false"
             - name: CONTROL_PANEL_PORT
               value: "8082"
           ports:

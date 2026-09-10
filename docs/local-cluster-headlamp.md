@@ -83,8 +83,18 @@ mise exec kubectl@latest -- kubectl -n ldndrc create token ldndrc-headlamp --dur
 ## 5. Expose locally
 
 ```bash
-mise exec kubectl@latest -- kubectl -n ldndrc port-forward svc/ldndrc-control-panel 8082:8082 &
-mise exec kubectl@latest -- kubectl -n ldndrc port-forward svc/ldndrc-headlamp 8080:80 &
+# Foreground kubectl via mise is fine; background port-forwards must use the
+# direct binary (backgrounded `mise exec` hangs):
+KUBECTL=$(ls -d ~/.local/share/mise/installs/kubectl/*/kubectl 2>/dev/null | head -1)
+setsid nohup $KUBECTL -n ldndrc port-forward svc/ldndrc-control-panel 8082:8082 >/tmp/pf-cp.log 2>&1 < /dev/null &
+setsid nohup $KUBECTL -n ldndrc port-forward svc/ldndrc-headlamp 8080:80 >/tmp/pf-head.log 2>&1 < /dev/null &
+```
+
+Notes: use the direct kubectl binary (backgrounded `mise exec` hangs), and
+`setsid` so the forward survives the launching shell. Re-run after every
+control-panel rollout restart, and after any shell that started one exits.
+
+```bash
 curl http://127.0.0.1:8082/healthz   # expect {"status":"ok"}
 curl -o /dev/null -w "%{http_code}\n" http://127.0.0.1:8080/  # expect 200
 ```
@@ -98,6 +108,20 @@ Optional: real hostnames instead of `curl -H "Host: ..."` (needs sudo):
 # <LAN-IP> control.ros-platform.local editor.ros-platform.local \
 #   desktop.ros-platform.local gazebo.ros-platform.local
 ```
+
+### mDNS advertisement (real masters only, never k3d)
+
+Pod network namespaces cannot reach LAN multicast, so the base Deployment
+sets `ADVERTISE_MDNS=false`. On a real master laptop:
+
+```bash
+kubectl apply -f manifests/control-panel-hostnetwork-patch.yaml
+# set ADVERTISE_MDNS=true in manifests/control-panel-deployment.yaml, re-apply
+sudo ufw allow 5353/udp
+```
+
+Verify from a second laptop: `avahi-browse -r _ldndrc-master._tcp` should
+list the master with TXT `cluster=ldndrc`.
 
 ## 6. Create a session and test the gateway
 
