@@ -65,10 +65,12 @@ spec:
             # a PVC or the shared R2 persistence solution replaces it later.
             - name: NODES_DB
               value: /var/lib/ldndrc/nodes.json
-            # Public K3s join URL handed to approved laptops. Set this to the
-            # master's LAN address, e.g. https://192.168.1.50:6443.
+            # Public K3s join URL handed to approved laptops. Rehearsal value
+            # for the paired TUI run (nothing can actually join it — no real
+            # K3s master here); production sets the master's LAN address,
+            # e.g. https://192.168.1.50:6443.
             - name: K3S_JOIN_URL
-              value: ""
+              value: "https://192.168.1.37:6443"
             # Off here: a pod network namespace cannot reach LAN multicast,
             # so advertising would only log noise. Real masters apply
             # control-panel-hostnetwork-patch.yaml and set this to "true".

@@ -21,6 +21,19 @@ func keyModel(rows []CheckRow, key string) Model {
 	return next.(Model)
 }
 
+func TestQuitCommandIssued(t *testing.T) {
+	m := NewModel([]CheckRow{{Name: "OS", State: "green"}})
+	_, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("q")})
+	if cmd == nil {
+		t.Fatal("q must return a quit command, else the TUI hangs on the bye screen")
+	}
+	next, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("j")})
+	joined := next.(Model)
+	if !joined.JoinStarted {
+		t.Fatal("expected join to start")
+	}
+}
+
 func TestChecksToFixOnEnter(t *testing.T) {
 	rows := []CheckRow{{Name: "OS", State: "green"}, {Name: "Driver", State: "red", Detail: "470 < 535"}}
 	m := keyModel(rows, "enter")

@@ -71,10 +71,17 @@ type (
 )
 
 // Update implements tea.Model: pure keypress-to-state transitions.
+// A quit decision returns tea.Quit — setting the flag alone only swaps the
+// view and would leave the program hanging (fixed after the guest reported
+// an unexitable TUI).
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
-		return m.handleKey(msg.String()), nil
+		m = m.handleKey(msg.String())
+		if m.quitting {
+			return m, tea.Quit
+		}
+		return m, nil
 	case StepMsg:
 		m.StepLog = append(m.StepLog, string(msg))
 		return m, nil
