@@ -64,7 +64,12 @@ func NewSessionHandler(authService *auth.Service, store sessionLookup, next http
 			return
 		}
 
-		target, err := url.Parse("http://" + session.ServiceName + "." + envOr("SESSION_NAMESPACE", "ldndrc") + ".svc.cluster.local:" + strconv.Itoa(route.port))
+		// Trailing dot makes this a FQDN so the stub resolver skips the
+		// search list. Without it, a hostNetwork pod inherits the LAN
+		// search suffix (e.g. domain.name) and a wildcard ISP answer can
+		// short-circuit the correct CoreDNS reply (seen live on the real
+		// master: 185.38.109.x instead of the ClusterIP).
+		target, err := url.Parse("http://" + session.ServiceName + "." + envOr("SESSION_NAMESPACE", "ldndrc") + ".svc.cluster.local.:" + strconv.Itoa(route.port))
 		if err != nil {
 			writeGatewayError(w, http.StatusInternalServerError, "invalid session target")
 			return
