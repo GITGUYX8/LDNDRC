@@ -6,6 +6,10 @@
 package auth
 
 import (
+	"crypto/hmac"
+	"crypto/sha256"
+	"crypto/subtle"
+	"encoding/hex"
 	"errors"
 	"net/http"
 	"os"
@@ -101,6 +105,28 @@ func (s *Service) ClearSessionCookie(w http.ResponseWriter) {
 		SameSite: http.SameSiteLaxMode,
 		Secure:   os.Getenv("COOKIE_SECURE") == "true",
 	})
+}
+
+// IssueCSRF derives a per-login CSRF token bound to tokenString. It is
+// HMAC(JWT_SECRET, "csrf:"+jwt): stateless (no store), unforgeable
+// without the secret, and rotates whenever the session is re-issued.
+// The browser keeps it in JS memory (never a cookie) and sends it back
+// as the X-CSRF-Token header on cookie-authenticated mutations.
+func (s *Service) IssueCSRF(tokenString string) string {
+	mac := hmac.New(sha256.New, s.secret)
+	mac.Write([]byte("csrf:" + tokenString))
+	return hex.EncodeToString(mac.Sum(nil))
+}
+
+// VerifyCSRF reports whether csrf is the token bound to tokenString.
+func (s *Service) VerifyCSRF(tokenString, csrf string) bool {
+	want := s.IssueCSRF(tokenString)
+	got, err := hex.DecodeString(csrf)
+	wantBytes, _ := hex.DecodeString(want)
+	if err != nil || len(got) != len(wantBytes) {
+		return false
+	}
+	return subtle.ConstantTimeCompare(got, wantBytes) == 1
 }
 
 // VerifyCookie authenticates the configured session cookie from a request.

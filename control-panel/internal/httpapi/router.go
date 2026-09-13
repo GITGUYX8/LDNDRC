@@ -69,7 +69,7 @@ func NewRouterWithNodes(authSvc *auth.Service, store sessionStore, nodeStore *no
 			return
 		}
 		authSvc.SetSessionCookie(w, token)
-		writeJSON(w, http.StatusOK, map[string]string{"token": token})
+		writeJSON(w, http.StatusOK, map[string]string{"token": token, "csrf_token": authSvc.IssueCSRF(token)})
 	})
 
 	if store != nil {
@@ -282,7 +282,7 @@ func NewRouterWithNodes(authSvc *auth.Service, store sessionStore, nodeStore *no
 		})
 	}
 
-	return logRequests(mux)
+	return logRequests(guardCSRF(authSvc, mux))
 }
 
 func writeNodeError(w http.ResponseWriter, err error) {
