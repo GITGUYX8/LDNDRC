@@ -142,10 +142,13 @@ Today only the manual `join-cluster.sh` path exists. Approval dashboard UI
 is deferred until the R4 frontend lands — P1 approval is API/`curl`-driven.
 
 - Implement in the report's phase order — **P1 nodes API done
-  (checkpoint-14), P2 advertise done (checkpoint-17), P4 join binary
-  built and Join screen wired (checkpoint-18)**; live second-laptop
-  acceptance, P5–P6 next — keeping the bash path until the Go binary
-  is proven on real hardware.
+  (checkpoint-14), P2 advertise live on the real master
+  (checkpoint-20: `_ldndrc-master._tcp` observed server-side, guest
+  `avahi-browse` sighting pending), P4 join binary built and Join
+  screen wired (checkpoint-18)**; master-side cutover done
+  (checkpoint-20: real K3s, recovered JWT, hostNetwork, gateway matrix
+  green) — live second-laptop agent acceptance, P5–P6 next, keeping
+  the bash path until the Go binary is proven on real hardware.
 - Verify: a real second laptop joins as Host, appears Ready with the Host
   label, and schedules session pods; denial path tested too.
 - Effort: several days; needs a second physical machine for the real proof.

@@ -34,7 +34,7 @@ flowchart LR
     ONB["Onboarding CP14–CP19<br/>nodes API, join binary,<br/>releases, mDNS, rehearsal"]:::prov
     YOU["YOU ARE HERE<br/>Sep 2026, main green"]:::prov
 
-    REAL["Real K3s master<br/>+ full agent join"]:::missing
+    REAL["Real K3s master LIVE<br/>agent join pending"]:::prov
     FEAT["R2 persistence<br/>R3 CSRF · R4 frontend"]:::missing
     IMG["R6 real image<br/>R7 hardening"]:::missing
     P56["P5 Windows · P6 docs"]:::missing
@@ -56,7 +56,7 @@ ASCII fallback:
 plan.md/genesis -> CP01-04 foundation -> CP05-06 sessions -> CP07+R1 gateway
   -> CP08-09 verification -> CP10 observability -> CP11-12 demo-ready
   -> CP14-19 onboarding => YOU ARE HERE
-  => real-master join => R2/R3/R4 features (+ P5/P6 alongside) => R6/R7
+  => real-master LIVE (baseline green, agent join pending) => R2/R3/R4 features (+ P5/P6 alongside) => R6/R7
 Removed along the way: StatefulSet model, path routing, systemd plan, v0.1.0
 ```
 
@@ -89,7 +89,7 @@ flowchart TB
     Head["Headlamp<br/>LAN :8080 + token"]:::done
     K3S["K3s API (k3d)<br/>client-go provisioner"]:::done
 
-    RealM["Real K3s master<br/>serves :6443"]:::missing
+    RealM["Real K3s master :6443<br/>LIVE, baseline green<br/>(agent join pending)"]:::prov
     RealWS["Jazzy/Harmonic image<br/>~10GB+ build"]:::missing
     UI["Student frontend<br/>login/launch/workspace"]:::missing
     Persist["Shared persistence<br/>sessions + nodes"]:::missing
@@ -114,11 +114,14 @@ Missing: real master :6443, real workspace image, student frontend,
   shared persistence, CSRF. Removed: StatefulSet model, path routing, systemd.
 ```
 
-Live snapshot backing this map: control-panel, headlamp, and Bob's demo
-session pods all 1/1 Running; per-session Service with 7682/8080/9002 and
-bound 5Gi PVC; Traefik ingress on all four hostnames; LAN forwards `:8082`
-(API) and `:8080` (Headlamp); gateway verified editor-200 / desktop-502 /
-no-cookie-401; nothing listens on `:6443` (k3d API is localhost-only).
+Live snapshot backing this map (checkpoint-20, real master `hari`):
+control-panel (hostNetwork, `ADVERTISE_MDNS=true`, recovered JWT),
+headlamp, and a fresh demo session pod all 1/1 Running; per-session
+Service with 7682/8080/9002 and bound 5Gi PVC (`local-path`); Traefik
+ingress on all four hostnames with ADDRESS `192.168.1.37`; gateway
+verified editor-200 (stand-in body) / desktop-502 / no-cookie-401;
+`_ldndrc-master._tcp` advertising live; firewall open for
+6443/80/443/5353/8472. k3d `ldndrc` stopped (rollback intact).
 
 ## 3. Onboarding swimlane (as built and proven)
 
@@ -153,7 +156,8 @@ Proven on real Wi-Fi; agent install awaits a real K3s master.
 
 Colour status of this flow: register/approve/mint/cleanup green (live);
 TUI-driven variant amber (wired + unit-tested, rehearsal pending second
-terminal); agent install + watcher-joined red (needs real master).
+terminal); real master green (checkpoint-20 baseline, mDNS advertising);
+agent install + watcher-joined red (guest run deferred).
 
 ## 4. Verification ledger (claim → proof → observed output)
 
@@ -181,18 +185,22 @@ darwin guest-only; no silent installs and no Guest overrides (locked D1/D4);
 plain Actions releases; `MASTER_IP` required, never defaulted.
 
 Known debt (all acknowledged, none hidden): in-memory/emptyDir stores
-orphan resources on restart (R2 will subsume nodes JSON too); stand-in is
-not a workspace (R6); no student frontend (R4); no TLS/CSRF (R3/security);
-`K3S_JOIN_URL` rehearsal value; no real master join yet; Windows/WSL2 and
-LAN-mDNS unproven on hardware; legacy `join-cluster.sh` still the only
-complete join path.
+orphan resources on restart (R2 will subsume nodes JSON too — observed
+again live in checkpoint-20); stand-in is not a workspace (R6); no
+student frontend (R4); no TLS/CSRF (R3/security); guest agent join +
+guest mDNS sighting pending; Windows/WSL2 unproven on hardware; legacy
+`join-cluster.sh` still the only complete join path.
 
 ## 6. Remaining work funnel (ordered, with dependencies)
 
 1. **Paired TUI rehearsal** — second terminal drives the wired Join screen
    through approval + token receipt; abort at sudo prompt (no installs).
-2. **Real K3s master + full agent join** — unblocks `:6443`, watcher-joined,
-   P2 LAN-mDNS proof, session scheduling on new node.
+2. **Real K3s master: BASELINE DONE (checkpoint-20), agent join pending**
+   — master live on `:6443`, stack redeployed (recovered JWT,
+   hostNetwork + `ADVERTISE_MDNS=true`), gateway matrix green,
+   `_ldndrc-master._tcp` advertising. Remaining: paired guest run
+   (register → approve → token → real agent install → watcher-joined →
+   session schedules) + first guest `avahi-browse` sighting.
 3. **R3 CSRF → R2 persistence → R4 frontend** — secure, durable, visible.
 4. **P5 Windows/WSL2 + P6 deprecation/docs.**
 5. **R6 real image on GPU hardware → R7 hardening** (TLS, quotas, policy,
