@@ -65,6 +65,12 @@ spec:
             # a PVC or the shared R2 persistence solution replaces it later.
             - name: NODES_DB
               value: /var/lib/ldndrc/nodes.json
+            # Session records (R2): JSON beside NODES_DB, same emptyDir
+            # limits (survives container restarts, not pod redeploys).
+            # On boot the panel reconciles loaded records against live
+            # Deployments: existing adopted, missing tombstoned to stopped.
+            - name: SESSIONS_DB
+              value: /var/lib/ldndrc/sessions.json
             # Public K3s join URL handed to approved laptops. Rehearsal value
             # for the paired TUI run (nothing can actually join it — no real
             # K3s master here); production sets the master's LAN address,

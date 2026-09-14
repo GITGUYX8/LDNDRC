@@ -86,6 +86,17 @@ func (p *KubernetesProvisioner) Delete(session Session) error {
 	return nil
 }
 
+// WorkloadExists reports whether the session Deployment still exists.
+// Fail-open: any API error other than NotFound returns true so a
+// transient outage cannot tombstone live sessions during reconcile.
+func (p *KubernetesProvisioner) WorkloadExists(session Session) bool {
+	_, err := p.resource(deploymentGVR).Get(context.Background(), session.WorkloadName, metav1.GetOptions{})
+	if err != nil {
+		return !apierrors.IsNotFound(err)
+	}
+	return true
+}
+
 // Ready reports whether the session Deployment has an available replica.
 func (p *KubernetesProvisioner) Ready(session Session) (bool, error) {
 	deployment, err := p.resource(deploymentGVR).Get(context.Background(), session.WorkloadName, metav1.GetOptions{})

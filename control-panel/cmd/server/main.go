@@ -29,7 +29,14 @@ func main() {
 	}
 
 	authSvc := auth.NewService([]byte(jwtSecret), 24*time.Hour)
-	sessionStore := sessions.NewStore()
+	sessionsDB := os.Getenv("SESSIONS_DB")
+	if sessionsDB == "" {
+		sessionsDB = "/var/lib/ldndrc/sessions.json"
+	}
+	sessionStore, err := sessions.NewStoreWithPath(sessionsDB)
+	if err != nil {
+		log.Fatalf("load sessions db: %v", err)
+	}
 	nodeDB := os.Getenv("NODES_DB")
 	if nodeDB == "" {
 		nodeDB = "/var/lib/ldndrc/nodes.json"
@@ -55,7 +62,12 @@ func main() {
 		if err != nil {
 			log.Fatalf("configure Kubernetes session provisioner: %v", err)
 		}
-		sessionStore = sessions.NewStoreWithProvisioner(provisioner)
+		sessionStore, err = sessions.NewStoreWithProvisionerAndPath(provisioner, sessionsDB)
+		if err != nil {
+			log.Fatalf("load sessions db: %v", err)
+		}
+		adopted, tombstoned := sessionStore.Reconcile(provisioner.WorkloadExists)
+		log.Printf("sessions reconcile: %d adopted, %d tombstoned", adopted, tombstoned)
 		config, err := rest.InClusterConfig()
 		if err != nil {
 			log.Fatalf("load in-cluster Kubernetes config: %v", err)

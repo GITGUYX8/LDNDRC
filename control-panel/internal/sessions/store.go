@@ -5,8 +5,10 @@ package sessions
 
 import (
 	"crypto/rand"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
 	"sync"
 	"time"
 )
@@ -54,10 +56,14 @@ type StatusProvider interface {
 	Ready(Session) (bool, error)
 }
 
-// Store tracks session ownership and lifecycle. The default store is
-// in-memory; production persistence can be added without changing the API.
+// Store tracks session ownership and lifecycle. With a path set, every
+// mutation is saved to a JSON file (same crash-safe-ish pattern as the
+// nodes store: write the whole map under lock); without a path the store
+// is purely in-memory. Production persistence can be added without
+// changing the API.
 type Store struct {
 	mu          sync.RWMutex
+	path        string
 	sessions    map[string]Session
 	byUser      map[string]string
 	provisioner Provisioner
@@ -73,6 +79,91 @@ func NewStoreWithProvisioner(provisioner Provisioner) *Store {
 		byUser:      make(map[string]string),
 		provisioner: provisioner,
 	}
+}
+
+// NewStoreWithPath loads prior sessions from path (absent file starts
+// empty) and persists every mutation there. A corrupt file is a hard
+// error: silently starting empty would orphan live workloads.
+func NewStoreWithPath(path string) (*Store, error) {
+	return NewStoreWithProvisionerAndPath(nil, path)
+}
+
+// NewStoreWithProvisionerAndPath combines a provisioner with file persistence.
+func NewStoreWithProvisionerAndPath(provisioner Provisioner, path string) (*Store, error) {
+	s := &Store{
+		path:        path,
+		sessions:    make(map[string]Session),
+		byUser:      make(map[string]string),
+		provisioner: provisioner,
+	}
+	if path == "" {
+		return s, nil
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return s, nil
+		}
+		return nil, fmt.Errorf("read sessions db: %w", err)
+	}
+	var saved struct {
+		Sessions map[string]Session `json:"sessions"`
+	}
+	if err := json.Unmarshal(data, &saved); err != nil {
+		return nil, fmt.Errorf("parse sessions db: %w", err)
+	}
+	for id, session := range saved.Sessions {
+		s.sessions[id] = session
+		if session.Status != StatusStopped && session.Status != StatusError {
+			if _, taken := s.byUser[session.Username]; !taken {
+				s.byUser[session.Username] = id
+			}
+		}
+	}
+	return s, nil
+}
+
+// Reconcile compares loaded sessions against live workloads: records whose
+// Deployment still exists are adopted as-is (readiness re-probes lazily on
+// next Current), records whose workload is gone are tombstoned to stopped
+// with a message — never silently deleted, never auto-reprovisioned.
+// exists reports workload presence; it must fail open (true on error) so a
+// transient API outage cannot mass-tombstone live sessions.
+func (s *Store) Reconcile(exists func(Session) bool) (adopted, tombstoned int) {
+	s.mu.RLock()
+	live := make([]Session, 0, len(s.sessions))
+	for _, session := range s.sessions {
+		switch session.Status {
+		case StatusProvisioning, StatusReady, StatusStopping:
+			live = append(live, session)
+		}
+	}
+	s.mu.RUnlock()
+	for _, session := range live {
+		if exists(session) {
+			adopted++
+			continue
+		}
+		if _, err := s.setStatus(session.Username, session.ID, StatusStopped, "workload gone at restart"); err == nil {
+			tombstoned++
+		}
+	}
+	return adopted, tombstoned
+}
+
+// saveLocked writes the full session map. Caller must hold the lock,
+// mirroring the nodes store pattern.
+func (s *Store) saveLocked() error {
+	if s.path == "" {
+		return nil
+	}
+	data, err := json.Marshal(struct {
+		Sessions map[string]Session `json:"sessions"`
+	}{Sessions: s.sessions})
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(s.path, data, 0o600)
 }
 
 func (s *Store) Create(username string) (Session, error) {
@@ -110,7 +201,18 @@ func (s *Store) Create(username string) (Session, error) {
 		UpdatedAt:    now,
 	}
 	s.sessions[id] = session
+	prevID, hadPrev := s.byUser[username]
 	s.byUser[username] = id
+	if err := s.saveLocked(); err != nil {
+		delete(s.sessions, id)
+		if hadPrev {
+			s.byUser[username] = prevID
+		} else {
+			delete(s.byUser, username)
+		}
+		s.mu.Unlock()
+		return Session{}, fmt.Errorf("persist session: %w", err)
+	}
 	provisioner := s.provisioner
 	s.mu.Unlock()
 
@@ -196,6 +298,12 @@ func (s *Store) setStatus(username, id string, status Status, message string) (S
 	session.Error = message
 	session.UpdatedAt = time.Now().UTC()
 	s.sessions[id] = session
+	// Durability is best-effort after the in-memory truth: on save failure
+	// the mutation stands (callers see an error) and the next mutation
+	// re-saves. Rolling back real state over a disk error would be worse.
+	if err := s.saveLocked(); err != nil {
+		return session, fmt.Errorf("persist session: %w", err)
+	}
 	return session, nil
 }
 
