@@ -282,6 +282,11 @@ func NewRouterWithNodes(authSvc *auth.Service, store sessionStore, nodeStore *no
 		})
 	}
 
+	// Student SPA (embedded UI-1 bundle, placeholder until then): exact
+	// dist files when present, index.html fallback for client routes.
+	// Registered last; /api/* and /healthz win by specificity.
+	mux.HandleFunc("GET /", SPAHandler().ServeHTTP)
+
 	return logRequests(guardCSRF(authSvc, mux))
 }
 

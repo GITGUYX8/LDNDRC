@@ -237,13 +237,30 @@ func (s *Store) List(username string) []Session {
 
 func (s *Store) Get(username, id string) (Session, error) {
 	s.mu.RLock()
-	defer s.mu.RUnlock()
 	session, ok := s.sessions[id]
 	if !ok {
+		s.mu.RUnlock()
 		return Session{}, ErrNotFound
 	}
 	if session.Username != username {
+		s.mu.RUnlock()
 		return Session{}, ErrForbidden
+	}
+	provisioner := s.provisioner
+	needsProbe := session.Status == StatusProvisioning
+	s.mu.RUnlock()
+	// Same lazy readiness as Current: the launch stepper polls this
+	// endpoint, so it must heal provisioning -> ready (R4 prerequisite).
+	if needsProbe {
+		if statusProvider, ok := provisioner.(StatusProvider); ok {
+			ready, err := statusProvider.Ready(session)
+			if err != nil {
+				return Session{}, fmt.Errorf("check session readiness: %w", err)
+			}
+			if ready {
+				return s.setStatus(username, id, StatusReady, "")
+			}
+		}
 	}
 	return session, nil
 }
