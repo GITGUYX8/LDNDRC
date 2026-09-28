@@ -207,6 +207,9 @@ export function LaunchPage() {
   return (
     <main className="launch">
       <div className="panel">
+        <p className="muted small">
+          <Link to="/admin">Instructor console →</Link>
+        </p>
         <p className="status status--ok">
           <span className="status__dot" aria-hidden="true" /> Ready
           <span className="status__timer mono">{elapsed}</span>

@@ -101,3 +101,50 @@ export function deleteSession(id: string): Promise<{ session: Session }> {
     method: "DELETE",
   });
 }
+
+// UI-3 — instructor console. Backend seams (all Bearer-authed, CSRF on
+// mutations via the shared request() wrapper): GET /api/nodes,
+// POST /api/nodes/{id}/approve, POST /api/nodes/{id}/deny.
+
+export type NodeStatus =
+  | "pending"
+  | "approved"
+  | "denied"
+  | "joined"
+  | "expired";
+
+export interface JoinNode {
+  id: string;
+  hostname: string;
+  os: string;
+  arch: string;
+  cpu: number;
+  ram_gb: number;
+  gpu: string;
+  status: NodeStatus;
+  node_name: string;
+  reason?: string;
+  requested_at: string;
+  approved_at?: string;
+}
+
+export function listNodes(): Promise<{ nodes: JoinNode[] }> {
+  return request("/api/nodes");
+}
+
+export function approveNode(id: string): Promise<{ id: string; status: NodeStatus }> {
+  return request(`/api/nodes/${encodeURIComponent(id)}/approve`, {
+    method: "POST",
+    body: "{}",
+  });
+}
+
+export function denyNode(
+  id: string,
+  reason: string,
+): Promise<{ id: string; status: NodeStatus }> {
+  return request(`/api/nodes/${encodeURIComponent(id)}/deny`, {
+    method: "POST",
+    body: JSON.stringify({ reason }),
+  });
+}

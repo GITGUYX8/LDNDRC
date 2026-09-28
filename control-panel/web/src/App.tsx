@@ -3,6 +3,7 @@ import { useAuth } from "./auth";
 import type { ReactNode } from "react";
 import { LoginPage } from "./pages/Login";
 import { LaunchPage } from "./pages/Launch";
+import { AdminPage } from "./pages/Admin";
 import { WorkspacePage } from "./pages/Workspace";
 import { DesktopPage } from "./pages/Desktop";
 
@@ -49,6 +50,14 @@ export function App() {
         element={
           <RequireAuth>
             <DesktopPage />
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/admin"
+        element={
+          <RequireAuth>
+            <AdminPage />
           </RequireAuth>
         }
       />

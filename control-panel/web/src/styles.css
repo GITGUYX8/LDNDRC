@@ -320,3 +320,85 @@ a { color: var(--accent); }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }
+
+/* Admin (UI-3 instructor console) */
+.status--bad .status__dot { background: var(--danger); }
+
+.admin {
+  min-height: 100%;
+  display: flex;
+  justify-content: center;
+  padding: 2rem 1rem;
+}
+.panel--wide { width: min(1024px, 100%); }
+.admin__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+.admin h2 { margin-top: 2rem; }
+
+.metrics {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin: 0;
+  padding: 0;
+}
+.metric {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0.5rem 0.8rem;
+}
+.metric__value { font-size: 1.1rem; }
+.metric__label { color: var(--muted); font-size: 0.85rem; }
+
+/* Reference-pattern cards (uiux-design §7: user/session cards). */
+.cards--admin { grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
+.facts { margin: 0 0 1rem; display: grid; gap: 0.3rem; font-size: 0.9rem; }
+.facts > div { display: flex; gap: 0.6rem; }
+.facts dt { color: var(--muted); min-width: 5.5rem; }
+.facts dd { margin: 0; overflow-wrap: anywhere; }
+.stack { display: grid; gap: 0.6rem; }
+.chips { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.chip {
+  padding: 0.3rem 0.8rem;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.85rem;
+  transition: border-color 150ms ease-out, background 150ms ease-out;
+}
+.chip:hover { border-color: var(--accent); color: var(--ink); }
+.chip--active { background: var(--accent-soft); border-color: var(--accent); color: var(--ink); }
+.usercard__avatar {
+  width: 2.5rem;
+  height: 2.5rem;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  border: 1px solid var(--accent);
+  font-weight: 700;
+  font-size: 1.2rem;
+  margin: 0 0 0.6rem;
+}
+
+.input {
+  padding: 0.5rem 0.7rem;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--bg);
+  color: var(--ink);
+  font: inherit;
+  min-width: 200px;
+}

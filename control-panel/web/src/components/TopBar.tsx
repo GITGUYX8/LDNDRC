@@ -1,4 +1,4 @@
-import { NavLink } from "react-router-dom";
+import { Link, NavLink } from "react-router-dom";
 import { useAuth } from "../auth";
 import { useElapsed } from "../hooks";
 import type { Session } from "../api";
@@ -76,6 +76,9 @@ export function TopBar({
         )}
         <span className="user" title={username}>
           {username}
+          <Link className="btn btn--ghost" to="/admin" title="Instructor console">
+            Admin
+          </Link>
           <button
             type="button"
             className="btn btn--ghost"
