@@ -9,11 +9,11 @@ FROM ldndrc/ros2-gz:jazzy-harmonic-base
 ARG USERNAME=student
 ARG USER_UID=1000
 ARG USER_GID=1000
-ARG SELKIES_VERSION=1.6.2
+ARG SELKIES_VERSION=2.0.0
 ARG UBUNTU_VERSION=24.04
 ARG SELKIES_ARCH=amd64
-# 0 = skip Selkies (deferred to the 2.0.0 migration chunk); 1 = install it.
-ARG WITH_SELKIES=0
+# 1 = install Selkies (2.0.0); 0 = skip it (desktop stays 502).
+ARG WITH_SELKIES=1
 
 USER root
 
@@ -26,11 +26,9 @@ RUN curl -fsSL https://code-server.dev/install.sh | bash
 
 COPY install-selkies.sh /tmp/install-selkies.sh
 
-# Selkies is deferred (WITH_SELKIES=0): upstream deleted the 1.6.2 release
-# assets and the 2.0.0 packaging needs its own migration chunk
-# (see checkpoint-28). Desktop stays 502-by-design until then, same as the
-# demo stand-in. The installer script is kept in-tree for that migration.
-RUN if [ "${WITH_SELKIES:-0}" = "1" ]; then chmod +x /tmp/install-selkies.sh \
+# Selkies 2.0.0 (pure-Python WebRTC/WebSockets; see install-selkies.sh).
+# WITH_SELKIES=0 skips it (desktop stays 502).
+RUN if [ "${WITH_SELKIES:-1}" = "1" ]; then chmod +x /tmp/install-selkies.sh \
     && SELKIES_VERSION=${SELKIES_VERSION} \
        UBUNTU_VERSION=${UBUNTU_VERSION} \
        SELKIES_ARCH=${SELKIES_ARCH} \
@@ -44,13 +42,11 @@ ENV SELKIES_PORT=8080
 ENV SELKIES_ENCODER=auto
 ENV SELKIES_VIDEO_BITRATE=3000
 ENV SELKIES_FRAMERATE=30
-# Keep a mono audio track for WebRTC negotiation; 6000 bps is the Opus floor.
-ENV SELKIES_AUDIO_BITRATE=6000
-ENV SELKIES_AUDIO_CHANNELS=1
 ENV SELKIES_ENABLE_RESIZE=true
 ENV SELKIES_SCREEN=1440x900x24
-ENV SELKIES_WEB_ROOT=/opt/gst-web
-ENV SELKIES_VENV=/opt/selkies-venv
+# Selkies 2.0.0 serves its packaged web client by default; audio off is a
+# native flag (no source patch). The 1.x SELKIES_WEB_ROOT/SELKIES_VENV and
+# audio bitrate envs are gone with the GStreamer build.
 ENV ICEWM_PREFERENCES=/usr/local/share/podlab/icewm-preferences
 ENV ICEWM_PREFOVERRIDE=/usr/local/share/podlab/icewm-prefoverride
 ENV ICEWM_WALLPAPER=/usr/local/share/podlab/wallpaper.jpg
