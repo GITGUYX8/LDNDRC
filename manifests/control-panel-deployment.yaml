@@ -56,7 +56,7 @@ spec:
             # 502-by-design; GPU stays "0" (CPU-only) until the nvidia
             # device-plugin follow-up.
             - name: SESSION_IMAGE
-              value: ldndrc/ros2-gz:jazzy-harmonic-4aa29d15
+              value: ldndrc/ros2-gz:jazzy-harmonic-10f1f10c
             - name: SESSION_HOME_STORAGE
               value: 5Gi
             # Demo-cluster value: the k3d node has no GPU, so sessions omit
