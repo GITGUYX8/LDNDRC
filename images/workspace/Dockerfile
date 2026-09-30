@@ -12,6 +12,8 @@ ARG USER_GID=1000
 ARG SELKIES_VERSION=1.6.2
 ARG UBUNTU_VERSION=24.04
 ARG SELKIES_ARCH=amd64
+# 0 = skip Selkies (deferred to the 2.0.0 migration chunk); 1 = install it.
+ARG WITH_SELKIES=0
 
 USER root
 
@@ -24,11 +26,15 @@ RUN curl -fsSL https://code-server.dev/install.sh | bash
 
 COPY install-selkies.sh /tmp/install-selkies.sh
 
-RUN chmod +x /tmp/install-selkies.sh \
+# Selkies is deferred (WITH_SELKIES=0): upstream deleted the 1.6.2 release
+# assets and the 2.0.0 packaging needs its own migration chunk
+# (see checkpoint-28). Desktop stays 502-by-design until then, same as the
+# demo stand-in. The installer script is kept in-tree for that migration.
+RUN if [ "${WITH_SELKIES:-0}" = "1" ]; then chmod +x /tmp/install-selkies.sh \
     && SELKIES_VERSION=${SELKIES_VERSION} \
        UBUNTU_VERSION=${UBUNTU_VERSION} \
        SELKIES_ARCH=${SELKIES_ARCH} \
-       /tmp/install-selkies.sh \
+       /tmp/install-selkies.sh; else echo "selkies deferred (WITH_SELKIES=0)"; fi \
     && rm -f /tmp/install-selkies.sh
 
 ENV CODE_SERVER_PORT=7682
