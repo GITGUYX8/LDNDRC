@@ -69,7 +69,7 @@ func NewRouterWithNodes(authSvc *auth.Service, store sessionStore, nodeStore *no
 			return
 		}
 		authSvc.SetSessionCookie(w, token)
-		writeJSON(w, http.StatusOK, map[string]string{"token": token})
+		writeJSON(w, http.StatusOK, map[string]string{"token": token, "csrf_token": authSvc.IssueCSRF(token)})
 	})
 
 	if store != nil {
@@ -282,7 +282,12 @@ func NewRouterWithNodes(authSvc *auth.Service, store sessionStore, nodeStore *no
 		})
 	}
 
-	return logRequests(mux)
+	// Student SPA (embedded UI-1 bundle, placeholder until then): exact
+	// dist files when present, index.html fallback for client routes.
+	// Registered last; /api/* and /healthz win by specificity.
+	mux.HandleFunc("GET /", SPAHandler().ServeHTTP)
+
+	return logRequests(guardCSRF(authSvc, mux))
 }
 
 func writeNodeError(w http.ResponseWriter, err error) {
