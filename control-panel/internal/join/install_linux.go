@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"strings"
 	"time"
 )
 
@@ -13,6 +14,9 @@ import (
 // hosts. It never runs silently: the caller must have obtained explicit
 // user consent (TUI decision 4) before invoking it.
 func InstallToolkit() error {
+	if _, err := exec.LookPath("apt-get"); err != nil {
+		return fmt.Errorf("automatic toolkit install needs Debian/Ubuntu (no apt-get on %s): install nvidia-container-toolkit manually per NVIDIA docs, then re-run", distroID())
+	}
 	for _, step := range [][]string{
 		{"sudo", "apt-get", "update"},
 		{"sudo", "apt-get", "install", "-y", "nvidia-container-toolkit"},
@@ -25,6 +29,23 @@ func InstallToolkit() error {
 		}
 	}
 	return nil
+}
+
+// distroID reports the os-release ID for error messages (unknown when
+// unreadable). Kept tiny on purpose: full multi-distro automation (pacman,
+// AUR helpers) is a separate feature; failing loudly beats running apt-get
+// to certain failure on Arch and friends.
+func distroID() string {
+	data, err := os.ReadFile("/etc/os-release")
+	if err != nil {
+		return "unknown distro"
+	}
+	for _, line := range strings.Split(string(data), "\n") {
+		if v, ok := strings.CutPrefix(line, "ID="); ok {
+			return strings.Trim(v, `"`)
+		}
+	}
+	return "unknown distro"
 }
 
 // ToolkitPresent reports whether the toolkit is already installed.
@@ -58,9 +79,14 @@ func InstallAgent(k3sURL, token, nodeName string) error {
 	if err := tmp.Close(); err != nil {
 		return err
 	}
+	// NOTE: no --node-label here on purpose. kubelet --node-labels rejects
+	// the kubernetes.io namespace (node-role.kubernetes.io/role is not
+	// allow-listed), so passing our host label kills kubelet at flag
+	// validation (seen live 2026-09-14). The master-side watcher labels
+	// the node (node-role.kubernetes.io/role=host + ldndrc/host=true)
+	// via the API — unrestricted — as soon as it goes Ready.
 	cmd := exec.Command("sh", tmpName, "agent",
-		"--node-name", nodeName,
-		"--node-label", "node-role.kubernetes.io/role=host")
+		"--node-name", nodeName)
 	cmd.Env = append(os.Environ(),
 		"K3S_URL="+k3sURL,
 		"K3S_TOKEN="+token,

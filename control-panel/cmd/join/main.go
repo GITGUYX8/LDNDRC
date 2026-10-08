@@ -59,6 +59,11 @@ func (a *appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	// engine goroutine exactly once (Client nils after launch).
 	if a.m.JoinStarted && a.cfg.Client != nil {
 		cfg := a.cfg
+		// Sync the model's consent decision (confirm-screen No clears
+		// NeedToolkit after cfg was built); otherwise the engine would
+		// install despite the decline, or prompt despite the skip.
+		cfg.NeedToolkit = a.m.NeedToolkit
+		cfg.SkipNote = a.m.SkipNote
 		a.cfg.Client = nil // launch once
 		go func() {
 			emit := func(s string) { a.p.Send(join.StepMsg(s)) }
@@ -94,7 +99,14 @@ func runTUI(masterFlag, joinKey string) int {
 	rows := join.CheckRows(hw, master.Host, online)
 	m := join.NewModel(rows)
 	m.Master = master.Addr()
+	// A TEST_GPU override qualifies the machine on paper for a protocol
+	// run; the GPU isn't real, so a toolkit install would be meaningless.
+	// Skip the consent prompt entirely and say so in the step log.
 	m.NeedToolkit = hw.GPU != "" && !join.ToolkitPresent()
+	if m.NeedToolkit && os.Getenv("TEST_GPU") != "" {
+		m.NeedToolkit = false
+		m.SkipNote = "test GPU override — protocol run, no hardware install"
+	}
 
 	base := fmt.Sprintf("http://%s", master.Addr())
 	cfg := join.RunConfig{

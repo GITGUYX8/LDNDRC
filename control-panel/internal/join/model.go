@@ -36,8 +36,14 @@ type Model struct {
 	DoneMsg  string
 	Master   string
 	// NeedToolkit requests the consent prompt before joining (D4): the
-	// toolkit install never runs silently.
+	// toolkit install never runs silently. Answering No skips the
+	// install and joins anyway (SkipNote records why for the step log);
+	// Esc backs out to the checks screen without starting anything.
 	NeedToolkit bool
+	// SkipNote explains a skipped toolkit install in the join step log.
+	// Set when a TEST_GPU override implies protocol-only intent, or when
+	// the user declines at the consent prompt.
+	SkipNote string
 	// PendingPrompt is shown on ScreenConfirm.
 	PendingPrompt string
 	// JoinStarted marks the flow launched; the cmd/join glue watches this
@@ -112,7 +118,7 @@ func (m Model) handleKey(key string) Model {
 			m.Screen = ScreenFix
 		} else if key == "j" && !hasRed {
 			if m.NeedToolkit {
-				m.PendingPrompt = "Install the NVIDIA container toolkit now? (needs sudo)  [y/N]"
+				m.PendingPrompt = "Install the NVIDIA container toolkit now? (needs sudo)  [y: install / n: skip and join without GPU]"
 				m.Screen = ScreenConfirm
 			} else {
 				m.Screen = ScreenJoin
@@ -128,7 +134,12 @@ func (m Model) handleKey(key string) Model {
 		case "y", "Y":
 			m.Screen = ScreenJoin
 			m.JoinStarted = true
-		case "n", "N", "esc":
+		case "n", "N":
+			m.NeedToolkit = false
+			m.SkipNote = "declined by user — joining without GPU support"
+			m.Screen = ScreenJoin
+			m.JoinStarted = true
+		case "esc":
 			m.Screen = ScreenChecks
 		}
 	case ScreenJoin:

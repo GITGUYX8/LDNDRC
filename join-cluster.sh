@@ -38,11 +38,12 @@ echo "[join-cluster] Detected: CPU=${CPU} cores, RAM=${RAM_GB}GB, GPU=$( [ "$HAS
 # Every criterion must pass; the log above is what test-join.sh greps for.
 if [ "$CPU" -ge 8 ] && [ "$RAM_GB" -ge 16 ] && [ "$HAS_GPU" -ge 1 ]; then
     echo "[join-cluster] High-end laptop detected. Joining as HOST."
-    # The installer reads K3S_URL/K3S_TOKEN from the environment and the
-    # --node-label marks this node so simulation pods can be scheduled
-    # onto it via nodeSelector.
+    # NOTE: no --node-label here. kubelet --node-labels rejects the
+    # kubernetes.io namespace, so the flag kills kubelet at startup.
+    # The master-side watcher applies node-role.kubernetes.io/role=host
+    # via the API once the node goes Ready.
     curl -sfL https://get.k3s.io | K3S_URL="https://${MASTER_IP}:6443" K3S_TOKEN="${NODE_TOKEN}" \
-        sh -s - agent --node-label "node-role.kubernetes.io/role=host"
+        sh -s - agent
 else
     echo "[join-cluster] Low-end laptop detected. Do not join cluster. Use browser to access platform."
     exit 0

@@ -89,13 +89,28 @@ func TestConfirmToolkitFlow(t *testing.T) {
 	}
 }
 
-func TestConfirmDeclineReturns(t *testing.T) {
+func TestConfirmDeclineSkipsAndJoins(t *testing.T) {
 	rows := []CheckRow{{Name: "OS", State: "green"}}
 	m := NewModel(rows)
 	m.NeedToolkit = true
 	next, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("j")})
 	m = next.(Model)
 	next, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("n")})
+	if m = next.(Model); m.Screen != ScreenJoin || !m.JoinStarted {
+		t.Fatalf("screen=%v started=%v, want join/started", m.Screen, m.JoinStarted)
+	}
+	if m.NeedToolkit || m.SkipNote == "" {
+		t.Fatalf("needToolkit=%v skipNote=%q, want false + reason", m.NeedToolkit, m.SkipNote)
+	}
+}
+
+func TestConfirmEscReturns(t *testing.T) {
+	rows := []CheckRow{{Name: "OS", State: "green"}}
+	m := NewModel(rows)
+	m.NeedToolkit = true
+	next, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("j")})
+	m = next.(Model)
+	next, _ = m.Update(tea.KeyMsg{Type: tea.KeyEsc})
 	if m = next.(Model); m.Screen != ScreenChecks || m.JoinStarted {
 		t.Fatalf("screen=%v started=%v, want checks/not-started", m.Screen, m.JoinStarted)
 	}

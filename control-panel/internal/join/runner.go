@@ -19,10 +19,14 @@ type RunConfig struct {
 	ControlURL  string // http://master:8082 for approval messages
 	NeedToolkit bool
 	ToolkitFn   func() error
-	AgentFn     func(k3sURL, token, nodeName string) error
-	Timeout     time.Duration
-	Emit        func(string)
-	BundleDir   string
+	// SkipNote records why a toolkit install was skipped (test-GPU
+	// override or user decline); emitted to the step log so the skip
+	// is visible, never silent.
+	SkipNote  string
+	AgentFn   func(k3sURL, token, nodeName string) error
+	Timeout   time.Duration
+	Emit      func(string)
+	BundleDir string
 }
 
 func (c RunConfig) emit(s string) {
@@ -86,6 +90,9 @@ func RunJoin(ctx context.Context, cfg RunConfig) (string, error) {
 			return failWithBundle(cfg, err, append(steps, "toolkit install: "+err.Error()))
 		}
 		steps = append(steps, "toolkit installed")
+	} else if cfg.SkipNote != "" {
+		emit("toolkit skipped (" + cfg.SkipNote + ")")
+		steps = append(steps, "toolkit skipped")
 	}
 	agent := cfg.AgentFn
 	if agent == nil {

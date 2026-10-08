@@ -40,8 +40,11 @@ func TestMintTokenShape(t *testing.T) {
 	if secret.StringData["token-id"] != tokenID {
 		t.Fatalf("secret token-id mismatch: %#v", secret.StringData)
 	}
-	if secret.StringData["auth-extra-groups"] != "system:bootstrappers" {
-		t.Fatalf("secret groups mismatch: %#v", secret.StringData)
+	if secret.StringData["auth-extra-groups"] != "system:bootstrappers:k3s:default-node-token" {
+		t.Fatalf("secret groups mismatch (must match `k3s token create`): %#v", secret.StringData)
+	}
+	if secret.StringData["usage-bootstrap-signing"] != "true" {
+		t.Fatalf("secret signing usage mismatch: %#v", secret.StringData)
 	}
 }
 

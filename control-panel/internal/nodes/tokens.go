@@ -49,12 +49,21 @@ func (m *BootstrapMinter) MintToken(ctx context.Context, nodeName, description s
 		},
 		Type: "bootstrap.kubernetes.io/token",
 		StringData: map[string]string{
-			"token-id":                       tokenID,
-			"token-secret":                   secret,
-			"expiration":                     exp,
-			"description":                    description,
-			"auth-extra-groups":              "system:bootstrappers",
+			"token-id":     tokenID,
+			"token-secret": secret,
+			"expiration":   exp,
+			"description":  description,
+			// Must match `k3s token create` byte-for-byte: the K3s
+			// supervisor only honors agent joins from tokens carrying
+			// the k3s:default-node-token group. A bare
+			// system:bootstrappers secret authenticates at the
+			// apiserver (:6444) but the agent is rejected with
+			// "not authorized" at the supervisor (:6443). Verified
+			// live 2026-09-14 by diffing our secret against a
+			// k3s-minted one.
+			"auth-extra-groups":              "system:bootstrappers:k3s:default-node-token",
 			"usage-bootstrap-authentication": "true",
+			"usage-bootstrap-signing":        "true",
 		},
 	}, metav1.CreateOptions{})
 	if err != nil {
