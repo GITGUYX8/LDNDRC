@@ -68,7 +68,7 @@ blocking rows are green.
 | GPU | `nvidia-smi -L` | NVIDIA present | — | absent → Guest |
 | Driver | `nvidia-smi` version parse | ≥ 550 | 535–549 ("works, 550+ recommended" + upgrade cmd) | < 535 or missing. Note: `lspci` proves existence only — say so on the fix card |
 | Toolkit | `nvidia-container-toolkit --version` | present | — | missing but installable via apt (offered later with consent) |
-| Disk | free space on `/` | ≥ 25 GB (join ~1.5 GB + first workload pull ~5–10 GB + headroom) | — | below → Guest/stop |
+| Disk | free space on `/` | ≥ 25 GB (R6 budget: 10.2 GB workspace image + ~1 GB agent + 5 Gi first-session PVC + ~2 GB headroom ≈ 18–20 GB) | — | below → Guest/stop |
 | Network | TCP dial master:6443 | reachable | — | fail → Join stays locked *and* red means one of two things: (1) firewall — show exact `ufw allow` lines; (2) **nothing serves :6443 at all** (e.g. demo master runs k3d, not a real K3s server) — no firewall change fixes that; a real master is required. Observed live 2026-09-12: red-for-absence is correct D1 behavior, not a TUI bug. |
 | Sudo | `sudo -n true` (cached credentials) | yes | — | no → stop (agent + toolkit install need it). A red row here usually means *no cached credentials*, not *no admin rights*: run `sudo -v`, type the password once, re-run the binary. Observed live 2026-09-12. |
 | Master | address set (typed now, mDNS-filled later) | set | — | unset → Join locked |

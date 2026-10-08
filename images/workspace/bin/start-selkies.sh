@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Launches the Selkies-GStreamer desktop stream. Unlike Xpra (which started its
-# own display server), Selkies attaches to an existing X display, so this script
-# brings up a virtual X server and a window manager first, then execs Selkies.
+# Launches the Selkies 2.0.0 desktop stream. Selkies attaches to an existing
+# X display, so this script brings up a virtual X server and a window manager
+# first, then execs Selkies. (2.0.0 is pure Python — no GStreamer env to
+# source, no venv binary; /usr/bin/selkies comes from the .deb.)
 
 display="${SELKIES_DISPLAY:-${DISPLAY:-:50}}"
 case "${display}" in
@@ -13,24 +14,11 @@ esac
 export DISPLAY="${display}"
 export TZ="${TZ:-Asia/Kolkata}"
 
-# Bring in the Selkies-bundled GStreamer (NVENC + WebRTC plugins).
-if [[ -f /opt/gstreamer/gst-env ]]; then
-  # shellcheck disable=SC1091
-  . /opt/gstreamer/gst-env
-fi
-
-export SELKIES_WEB_ROOT="${SELKIES_WEB_ROOT:-/opt/gst-web}"
-SELKIES_VENV="${SELKIES_VENV:-/opt/selkies-venv}"
-selkies_bin="${SELKIES_VENV}/bin/selkies-gstreamer"
-if [[ ! -x "${selkies_bin}" ]]; then
-  echo "Selkies executable not found at ${selkies_bin}" >&2
+selkies_bin="$(command -v selkies || true)"
+if [[ -z "${selkies_bin}" ]]; then
+  echo "Selkies executable not found on PATH" >&2
   exit 1
 fi
-export PATH="${SELKIES_VENV}/bin:${PATH}"
-
-has_nvidia_gpu() {
-  command -v nvidia-smi >/dev/null 2>&1 && nvidia-smi -L >/dev/null 2>&1
-}
 
 if [[ -z "${XDG_RUNTIME_DIR:-}" || ! -d "${XDG_RUNTIME_DIR}" || ! -w "${XDG_RUNTIME_DIR}" ]]; then
   export XDG_RUNTIME_DIR="/tmp/runtime-${USER:-student}"
@@ -43,10 +31,6 @@ display_num="${display#:}"
 x_socket="/tmp/.X11-unix/X${display_num}"
 
 export VGL_DISPLAY="${VGL_DISPLAY:-egl}"
-gpu_available=false
-if has_nvidia_gpu; then
-  gpu_available=true
-fi
 
 mkdir -p /tmp/.X11-unix
 chmod 1777 /tmp/.X11-unix 2>/dev/null || true
@@ -129,60 +113,61 @@ else
   echo "IceWM is not installed; continuing without a window manager" >&2
 fi
 
+# 2.0.0 encoder names are codecs (h264enc, vp8enc, ...), not GStreamer
+# elements. `auto` omits the flag (upstream default h264enc, software
+# without a GPU); anything else passes through and 2.0.0 validates it.
 requested_encoder="${SELKIES_ENCODER:-auto}"
-case "${requested_encoder}" in
-  auto)
-    if [[ "${gpu_available}" == "true" ]]; then
-      encoder="nvh264enc"
-    else
-      encoder="x264enc"
-    fi
-    ;;
-  *)
-    encoder="${requested_encoder}"
-    ;;
-esac
-export SELKIES_ENCODER="${encoder}"
+selkies_encoder_args=()
+if [[ "${requested_encoder}" != "auto" ]]; then
+  selkies_encoder_args=(--encoder="${requested_encoder}")
+fi
 
 port="${SELKIES_PORT:-8080}"
 
 # Authentication and TLS are owned by the upstream gateway (later phase); keep
-# them off here so a direct browser hit works during local testing.
+# them off here so a direct browser hit works during local testing. Audio is
+# off natively (replaces the 1.x pulsesrc source patch). Transport stays on
+# the upstream default (websockets); pass SELKIES_MODE=webrtc to try WebRTC.
 selkies_args=(
   --addr=0.0.0.0
   --port="${port}"
-  --web_root="${SELKIES_WEB_ROOT}"
-  --enable_https=false
-  --enable_basic_auth=false
-  --turn_host="${SELKIES_TURN_HOST:-}"
-  --turn_port="${SELKIES_TURN_PORT:-}"
-  --turn_shared_secret="${SELKIES_TURN_SHARED_SECRET:-}"
-  --turn_username="${SELKIES_TURN_USERNAME:-}"
-  --turn_password="${SELKIES_TURN_PASSWORD:-}"
-  --turn_protocol="${SELKIES_TURN_PROTOCOL:-udp}"
-  --turn_tls="${SELKIES_TURN_TLS:-false}"
-  --encoder="${encoder}"
-  --video_bitrate="${SELKIES_VIDEO_BITRATE:-3000}"
+  --enable-https=false
+  --enable-basic-auth=false
+  --audio-enabled=false
+  --enable-clipboard="${SELKIES_ENABLE_CLIPBOARD:-true}"
+  --enable-resize="${SELKIES_ENABLE_RESIZE:-true}"
+  --video-bitrate="${SELKIES_VIDEO_BITRATE:-3000}"
   --framerate="${SELKIES_FRAMERATE:-30}"
-  --audio_bitrate="${SELKIES_AUDIO_BITRATE:-6000}"
-  --audio_channels="${SELKIES_AUDIO_CHANNELS:-1}"
-  --enable_clipboard="${SELKIES_ENABLE_CLIPBOARD:-true}"
-  --enable_resize="${SELKIES_ENABLE_RESIZE:-true}"
+  --turn-host="${SELKIES_TURN_HOST:-}"
+  --turn-port="${SELKIES_TURN_PORT:-}"
+  --turn-shared-secret="${SELKIES_TURN_SHARED_SECRET:-}"
+  --turn-username="${SELKIES_TURN_USERNAME:-}"
+  --turn-password="${SELKIES_TURN_PASSWORD:-}"
+  --turn-protocol="${SELKIES_TURN_PROTOCOL:-udp}"
+  --turn-tls="${SELKIES_TURN_TLS:-false}"
   # STUN is always on: ICE gathers host/server-reflexive candidates, so a
   # same-network (campus LAN / localhost) client connects directly with no relay.
-  --stun_host="${SELKIES_STUN_HOST:-stun.l.google.com}"
-  --stun_port="${SELKIES_STUN_PORT:-19302}"
+  --stun-host="${SELKIES_STUN_HOST:-stun.l.google.com}"
+  --stun-port="${SELKIES_STUN_PORT:-19302}"
 )
+
+# Transport stays on the upstream default (websockets) unless overridden.
+if [[ -n "${SELKIES_MODE:-}" ]]; then
+  selkies_args+=(--mode="${SELKIES_MODE}")
+fi
+if [[ "${#selkies_encoder_args[@]}" -gt 0 ]]; then
+  selkies_args+=("${selkies_encoder_args[@]}")
+fi
 
 # A local test can pass direct TURN host/secret settings. The later production
 # path should prefer REST-minted, short-lived credentials instead.
 if [[ -n "${SELKIES_TURN_REST_URI:-}" ]]; then
-  selkies_args+=(--turn_rest_uri="${SELKIES_TURN_REST_URI}")
-  selkies_args+=(--turn_rest_username="${SELKIES_TURN_REST_USERNAME:-selkies-${HOSTNAME:-workspace}}")
-  selkies_args+=(--turn_rest_username_auth_header="${SELKIES_TURN_REST_USERNAME_AUTH_HEADER:-x-auth-user}")
-  selkies_args+=(--turn_rest_protocol_header="${SELKIES_TURN_REST_PROTOCOL_HEADER:-x-turn-protocol}")
-  selkies_args+=(--turn_rest_tls_header="${SELKIES_TURN_REST_TLS_HEADER:-x-turn-tls}")
+  selkies_args+=(--turn-rest-uri="${SELKIES_TURN_REST_URI}")
+  selkies_args+=(--turn-rest-username="${SELKIES_TURN_REST_USERNAME:-selkies-${HOSTNAME:-workspace}}")
+  selkies_args+=(--turn-rest-username-auth-header="${SELKIES_TURN_REST_USERNAME_AUTH_HEADER:-x-auth-user}")
+  selkies_args+=(--turn-rest-protocol-header="${SELKIES_TURN_REST_PROTOCOL_HEADER:-x-turn-protocol}")
+  selkies_args+=(--turn-rest-tls-header="${SELKIES_TURN_REST_TLS_HEADER:-x-turn-tls}")
 fi
 
-echo "Starting selkies-gstreamer on ${display} port ${port} (encoder=${encoder}, web_root=${SELKIES_WEB_ROOT})"
+echo "Starting selkies 2.0.0 on ${display} port ${port} (encoder=${requested_encoder})"
 exec "${selkies_bin}" "${selkies_args[@]}"

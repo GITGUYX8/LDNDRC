@@ -28,6 +28,11 @@ type Thresholds struct {
 }
 
 // DefaultThresholds carries the project-wide Host bars.
+//
+// MinDiskGB budget (R6, real workspace image): 10.2GB image + ~1GB k3s
+// agent + 5Gi first-session PVC + ~2GB headroom ≈ 18–20GB, so 25GB
+// holds with margin. Revisit if hosts routinely run 3+ local sessions
+// (15Gi of PVCs) or the image grows past ~12GB.
 func DefaultThresholds() Thresholds {
 	return Thresholds{MinCPU: 8, MinRAMGB: 16, MinDriver: 535, WantDriver: 550, MinDiskGB: 25}
 }

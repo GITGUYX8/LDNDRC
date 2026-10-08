@@ -249,7 +249,7 @@ A 5s in-cluster watcher labels Ready nodes `role=host` and marks them `joined`. 
 | `JWT_SECRET` | — (required, exits if unset) | Signs auth tokens (24h TTL) + session cookie |
 | `CONTROL_PANEL_PORT` | `8082` | Listen port |
 | `SESSION_NAMESPACE` | `ldndrc` | Where session workloads are provisioned |
-| `SESSION_IMAGE` | `ldndrc/ros2-gz:jazzy-harmonic-workspace` | Session image (demo deploys override to `ldndrc/demo-standin:dev`) |
+| `SESSION_IMAGE` | `ldndrc/ros2-gz:jazzy-harmonic-10f1f10c` | Session image, immutable sha tag (demo deploys override to `ldndrc/demo-standin:dev`) |
 | `SESSION_HOME_STORAGE` | `5Gi` | Home PVC size per session |
 | `SESSION_GPU_LIMIT` | `1` | `nvidia.com/gpu` per session (`0` = schedule without GPU, for demos) |
 | `NODES_DB` | `/var/lib/ldndrc/nodes.json` | Onboarding DB (emptyDir in demo; a PVC later) |
