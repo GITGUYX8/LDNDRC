@@ -1,190 +1,167 @@
-# LDNDRC Roadmap — Done vs Remaining (Visual Guide)
+# LDNDRC Roadmap — What Is Built, What Is Left (Plain-English Tracker)
 
-> How to read this doc: **§1 is the map** (done = green, remaining = amber,
-> blocked/heavy = red). **§2 explains every remaining item** in build order
-> with acceptance criteria. **§3 is the suggested sequence** with effort
-> estimates. Mermaid diagrams render on GitHub/GitLab; an ASCII fallback
-> follows each one.
+> Companion to `docs/project-journey-report.md` (the friendly front door:
+> final-vs-now, mind-map, architecture with brackets, decision graph) and
+> `local_dev_docs/detailed-project-report.md` (technical appendix).
+> **§1 is the map** (green = works today, amber = half-ready, red = left).
+> **§2 explains each leftover** in build order, in simple words.
+> **§3 is the suggested order** with sizes. Mermaid renders on GitHub/GitLab;
+> a plain-text fallback follows each diagram.
+>
+> **Last updated:** 2026-10-13 · `main@299702f` (R1/R2/R3/R4/R6 shipped, CP01–CP39).
 
 ## 1. The Map
 
-### 1a. Build journey (where we are)
+### 1a. Journey (how we got here — plain names)
 
 ```mermaid
 flowchart LR
     classDef done fill:#1d5c2e,stroke:#3ecf8e,color:#fff
     classDef next fill:#6b4e12,stroke:#f5b86c,color:#fff
     classDef later fill:#3a3f4b,stroke:#8b93a7,color:#fff
-    classDef heavy fill:#5c1d1d,stroke:#f56c6c,color:#fff
 
-    C01["CP01<br/>join script + k3d tests"]:::done
-    C02["CP02<br/>workspace images + isolation"]:::done
-    C03["CP03<br/>Go control panel skeleton"]:::done
-    C04["CP04<br/>manifests + UI/UX design"]:::done
-    C05["CP05<br/>per-session K8s provisioning"]:::done
-    C06["CP06<br/>control panel on K3s"]:::done
-    C07["CP07<br/>cookie gateway + host routing"]:::done
-    C08["CP08<br/>static verification"]:::done
-    C09["CP09<br/>live K3s verification"]:::done
-    C10["CP10<br/>Headlamp visuals"]:::done
-    C11["CP11<br/>optional GPU"]:::done
-    C12["CP12<br/>stand-in ready path"]:::done
-    YOU["YOU ARE HERE"]:::next
+    START["Start<br/>(idea + scripts)"]:::done
+    BOX["One box per student<br/>(CP05-06)"]:::done
+    DOOR["Doors<br/>(guard + names, old paths gone)"]:::done
+    PROOF["Proof<br/>(tests + live + glass wall)"]:::done
+    WELCOME["Welcoming<br/>(ask/approve/ticket)"]:::done
+    REAL["Real organizer<br/>(CP20 hari live)"]:::done
+    SAFE["Safe + memory<br/>(R3 + R2 live)"]:::done
+    SITE["Website<br/>(R4 Login..Admin live)"]:::done
+    WORLD["Real world<br/>(R6 10.8GB live)"]:::done
+    ONE["One line<br/>(CP39 merge)"]:::done
+    YOU["YOU ARE HERE<br/>Oct 2026 main"]:::next
 
-    R1["R1<br/>remove legacy ingress"]:::next
-    R2["R2<br/>session persistence"]:::next
-    R3["R3<br/>CSRF protection"]:::next
-    R4["R4<br/>student frontend UI"]:::later
-    R5["R5<br/>host onboarding (ldndrc-join)"]:::later
-    R6["R6<br/>real workspace image"]:::heavy
-    R7["R7<br/>hardening: TLS, policy, obs."]:::later
+    FIX["Login fix + full memory<br/>+ pretty viewer"]:::next
+    R5["Two-laptop join<br/>(R5)"]:::next
+    STURDY["Sturdy: encryption,<br/>limits, dashboards (R7)<br/>+ Windows + docs"]:::later
 
-    C01 --> C02 --> C03 --> C04 --> C05 --> C06 --> C07 --> C08 --> C09 --> C10 --> C11 --> C12 --> YOU --> R1 --> R2 --> R3 --> R4 --> R5 --> R6 --> R7
+    START --> BOX --> DOOR --> PROOF --> WELCOME --> REAL --> SAFE --> SITE --> WORLD --> ONE --> YOU --> FIX --> R5 --> STURDY
 ```
 
 ```text
-ASCII fallback (CP = done checkpoint, Rn = remaining item):
+ASCII fallback:
 
-CP01 -> CP02 -> CP03 -> CP04 -> CP05 -> CP06 -> CP07 -> CP08 -> CP09 -> CP10 -> CP11 -> CP12
-                                                                                        |
-                                                                                   YOU ARE HERE
-                                                                                        |
-                           R1 -> R2 -> R3 -> R4 -> R5 -> R6 (heavy, parallel) -> R7
+idea → one-box-per-student → doors → proof → welcoming → real organizer
+  → safe+memory → website → real world → one line => YOU ARE HERE
+  => login fix + full memory + viewer => two-laptop join => sturdy + Windows + docs.
 ```
 
-### 1b. System map (what exists vs what is missing)
+### 1b. System (what works vs what is missing — same brackets as the journey doc)
 
 ```mermaid
 flowchart TB
     classDef done fill:#1d5c2e,stroke:#3ecf8e,color:#fff
     classDef missing fill:#6b4e12,stroke:#f5b86c,color:#fff
-    classDef legacy fill:#5c1d1d,stroke:#f56c6c,color:#fff
 
-    Browser(["Guest browser"]):::done
-    DNS["*.ros-platform.local<br/>(hosts file / LAN DNS)"]:::missing
-    Traefik["Traefik (k3d loadbalancer :80/:443)"]:::done
-    CP["Control panel (Go)<br/>auth + sessions + gateway"]:::done
-    Store["Session store<br/>IN-MEMORY - lost on restart"]:::missing
-    K8s["K3s API (k3d)"]:::done
-    Sess["Per-user Deployment+Service+PVC"]:::done
-    WS["Workspace pod<br/>(demo-standin TODAY)"]:::missing
-    RealWS["Real Jazzy/Harmonic image"]:::missing
-    Head["Headlamp dashboard"]:::done
-    OldIng["ros2-ingress.yaml<br/>REMOVED (checkpoint-13)"]:::done
-    UI["Student frontend<br/>(login/launch/workspace)"]:::missing
-    Join["ldndrc-join onboarding"]:::missing
+    Browser(["Your browser + website<br/>(Login/Launch/Workspace/Admin)<br/>✅ Live"]):::done
+    Door["Front door Traefik (:80/:443)<br/>(reads the address, forwards)<br/>✅ Live"]:::done
+    Desk["Reception desk (Go)<br/>(login + boxes + guard)<br/>✅ Live"]:::done
+    Notebook["Notebook sessions.json<br/>(remembers boxes, small restarts safe)<br/>✅ Live"]:::done
+    Disk["Full memory on disk<br/>(big redeploys safe)<br/>🔴 R2-final"]:::missing
+    Org["Organizer hari :6443<br/>(decides what runs where)<br/>✅ Live"]:::done
+    World["Robot world 10.8GB<br/>(editor 200 + desktop 200 + sim data)<br/>✅ Live"]:::done
+    Viewer["Pretty 3D viewer<br/>(🔴 next, data frame today)"]:::missing
+    LoginFix["Login small fix<br/>(🔴 next)"]:::missing
+    Join["Second laptop installs<br/>(🔴 needs two laptops)"]:::missing
+    Glass["Glass wall Headlamp<br/>✅ Live"]:::done
 
-    Browser --> DNS --> Traefik --> CP
-    CP --> Store
-    CP --> K8s --> Sess --> WS
-    Sess -.-> RealWS
-    Browser --> Head
-    Traefik -.-> OldIng
-    CP -.-> UI
-    K8s -.-> Join
+    Browser --> Door --> Desk
+    Desk --> Notebook
+    Desk -.-> Disk
+    Desk --> Org --> World
+    World -.-> Viewer
+    Browser --> Glass
+    Desk -.-> Join
+    Desk -.-> LoginFix
 ```
 
-Legend:
+```text
+ASCII fallback:
 
-| Color | Meaning |
+browser --> front door --> desk --> notebook (small restarts safe).
+desk --> organizer --> robot world (editor + desktop + sim data live).
+Left: full disk memory, pretty viewer, login fix, second-laptop install.
+Glass wall (Headlamp) live. Old paths removed (R1 done).
+```
+
+| Colour | Meaning |
 |---|---|
-| Green | Built, deployed, verified live |
-| Amber | Missing or provisional — real remaining work |
-| Red | Legacy — works but scheduled for removal (none left after R1) |
+| Green | Built and tested on real machines |
+| Amber | Half-ready — works partly, needs the next step |
+| Red | Missing — real remaining work |
 
-## 2. Remaining Work in Detail
+## 2. What Is Left, In Build Order (simple words, with "done looks like")
 
-### R1 — Remove legacy ingress (done in checkpoint-13)
+### R1 — Old hallways removed (done, checkpoint-13)
 
-`manifests/ros2-ingress.yaml` routed `/code`, `/stream`, `/sim` on the
-bare hostname to the old shared `ros2-platform-svc`. Host-based routing
-(CP07, proven live in CP09/CP12) replaced it, so the ingress, the shared
-Service (`ros2-service.yaml`), and the fixed StatefulSet
-(`ros2-platform.yaml`) were deleted. Verified: only the control-panel
-ingress exists live, gateway hosts keep their proven 200/502/401 pattern,
-and the old `/code` path 404s.
+Long ago the website used shared hallways (`/code`, `/sim`, `/stream`) into one shared room. We replaced them with named doors (`editor.`, `desktop.`, `gazebo.`) into private boxes and demolished the old hallways. Proof: only the desk's front door exists today; old `/code` answers `404` (not found, correct).
 
-### R2 — Session persistence (medium, observed pain twice)
+### R2 — Memory (shipped small, full version left)
 
-The store is in-memory: every control-panel restart wipes sessions and
-orphans their K3s resources (seen live in CP09 and CP11, cleaned by hand).
+**What it is:** the desk's notebook. Every time a box is created or stopped, the desk writes it in `sessions.json` (a small file). On restart it re-reads: box still running → keep (adopt); box gone → mark `stopped` (never pretend it still runs).
 
-- Persist sessions (JSON file like the onboarding design's node store, or SQLite/Postgres later) and reconcile on boot: adopt matching live resources, mark the rest for cleanup.
-- Verify: restart control panel → sessions survive → gateway still routes → no orphans in `kubectl get`.
-- Effort: half a day (file store) to days (DB + migration).
+**Shipped (CP21):** small restarts lose nothing — proven by killing the container and seeing the same box ID come back, ready on first visit, editor OK first try.
 
-### R3 — CSRF protection (small–medium, reference parity)
+**Left (R2-final):** big redeploys (whole copy replaced) still lose track because the notebook lives on a temporary shelf (emptyDir: wiped when the whole copy is replaced). Move notebook + laptop-approvals to a real disk (PVC: a disk Kubernetes keeps, or a small database), and let desk updates replace the old copy gracefully (`maxUnavailable: 1`: always keep one desk answering). Done looks like: replace the whole desk, zero lost boxes.
 
-The reference project requires a CSRF token on mutating browser requests;
-our cookie API currently does not. Any site the student visits could POST to
-our API with their cookie attached.
+Size: half a day (disk) to days (database).
 
-- Issue CSRF token at login, require `X-CSRF-Token` header on POST/DELETE session routes, keep bearer-token API path unchanged.
-- Verify: unit tests (missing/invalid token → 401/403), live check via curl.
-- Effort: half a day.
+### R3 — Click safety (shipped, one small fix left)
 
-### R4 — Student frontend UI (large, design exists)
+**What it is:** proof each change-click came from our own website. Login hands the website a secret stamp (CSRF token: HMAC stamp = a fingerprint made with our secret key). Every create/stop/approve must show it or get `403` (blocked). Reads (looking at pages) need no stamp. The ask-to-join door stays open by design (strangers must knock) but is speed-limited.
 
-`uiux-design.md` specifies login → launch stepper → workspace shell
-(Code/Sim/Split views) as a React+Vite SPA embedded in the Go binary via
-`embed.FS`. Nothing is built yet; the API it needs is verified live.
+**Shipped (CP21):** stamps checked live — no stamp → blocked, wrong stamp → blocked, correct stamp → through; editor still loads.
 
-- Scaffold `control-panel/web/`, wire JWT + cookie auth, session CRUD polling, iframe embedding of editor/desktop, gzweb component for sim.
-- Verify phase-wise: UI-1 login+launch, UI-2 workspace shell, UI-3 admin view (matches the design doc's phasing).
-- Effort: days to a week.
+**Left (the arrival from the CP39 merge):** the login door itself wrongly demands a stamp, so a returning visitor with an old cookie gets blocked (`403`) instead of logged in. Fix: skip the stamp check on `/api/auth/login` + test + rebuild + delete-old-first rollout (delete the old desk copy first — door `:8082` fits only one) + live proof. Tidy the stale "Selkies deferred" comment in the same change.
 
-### R5 — Host onboarding `ldndrc-join` (large, design ready)
+Size: less than half a day.
 
-`onboarding-design-report.md` (amended 2026-09-06 for the in-cluster control
-panel) specifies the zero-touch flow: mDNS discovery, nodes register/approve
-API, short-lived bootstrap tokens via client-go, cross-platform join binary.
-Today only the manual `join-cluster.sh` path exists. Approval dashboard UI
-is deferred until the R4 frontend lands — P1 approval is API/`curl`-driven.
+### R4 — Student website (done, pretty viewer left)
 
-- Implement in the report's phase order — **P1 nodes API done
-  (checkpoint-14), P2 advertise live on the real master
-  (checkpoint-20: `_ldndrc-master._tcp` observed server-side, guest
-  `avahi-browse` sighting pending), P4 join binary built and Join
-  screen wired (checkpoint-18)**; master-side cutover done
-  (checkpoint-20: real K3s, recovered JWT, hostNetwork, gateway matrix
-  green) — live second-laptop agent acceptance, P5–P6 next, keeping
-  the bash path until the Go binary is proven on real hardware.
-- Verify: a real second laptop joins as Host, appears Ready with the Host
-  label, and schedules session pods; denial path tested too.
-- Effort: several days; needs a second physical machine for the real proof.
+**What it is:** the classroom site, built into the desk program (served from inside the Go file via `embed.FS`: the website files travel inside the desk binary; `web/dist/` build output is re-created, never committed). Pages: Login (enter) → Launch (big button + waiting stepper that asks "ready yet?" every 2 seconds, Cancel = delete) → Workspace (Code / Sim / Split side-by-side, both frames stay loaded so no reconnects, divider remembers its spot) → Desktop (full-screen button) → Admin (teacher cards).
 
-### R6 — Real workspace image (heavy, needs hardware)
+**Shipped (CP22–CP26):** all pages live on the real organizer — login gives token + stamp + wristband cookie; Launch goes waiting → ready (~3rd check); editor and desktop pictures load; Admin shows people/session/laptop cards and approve/deny works on real rows.
 
-The `demo-standin` proves plumbing only. The true workspace (ROS2 Jazzy +
-Gazebo Harmonic + code-server + Selkies, per `images/`) is a ~10GB+ build
-and needs a GPU host to shine.
+**Left (viewer slice):** the Sim frame shows raw data today (bridge answers `404-with-data`: pipe alive, no pretty page). Put the `sim-web-app/` 3D viewer (gzweb: Three.js WebGL = 3D pictures drawn by the browser) into the page; smoke-test the `world`/`house` robots. Optional later: a see-everyone Admin feed, teacher-only glass-wall lock.
 
-- Build `images/base` → `images/workspace` on a machine with disk and time;
-  import into the cluster; flip `SESSION_IMAGE` back from the stand-in.
-- Verify: session reaches `ready` with real services on 7682/8080/9002;
-  gateway editor/desktop/sim all 200; TurtleBot3 sim streams.
-- Effort: a day of build babysitting; full value only on GPU hardware.
+Size: half a day (viewer); the rest is done.
 
-### R7 — Production hardening (ongoing track)
+### R5 — Welcoming laptops (ask/approve live, full install needs two laptops)
 
-TLS/mTLS on the control panel API, NetworkPolicies isolating session pods,
-Prometheus/Grafana observability, log aggregation, resource quotas. Each is
-independently shippable; start with TLS + quotas when leaving the LAN-demo
-stage.
+**What it is:** zero-fuss joining. New laptop runs the pocket tool (`ldndrc-join`: small program, friendly text screens built with Bubble Tea): it measures muscles (CPU/RAM/GPU/disk — 25GB free required because the world picture is 10.8GB + first disk 5GB + room to breathe), finds the organizer (Wi-Fi shout = mDNS, or typed address `MASTER_IP` which is never guessed), asks to join (register: fingerprint + name), waits (poll: "approved yet?" every 5s), gets a 15-minute ticket once, installs the agent software (needs sudo password, never silent).
 
-## 3. Suggested Sequence
+**Shipped:** ask/approve/ticket/lookup pages live (also as Admin cards); Wi-Fi shout live on the organizer; pocket tool builds for 3 systems; register→approve→ticket proven over real Wi-Fi and on the real organizer; disk math documented; rehearsal fixes merged (`4eeffea`).
 
-| Step | Item | Why here | Effort |
+**Left:** the paired run with two physical laptops: `acceptance-second-laptop.sh` end to end (register → approve → ticket → real agent install → organizer marks it joined → a box actually runs on the new laptop), the "no" path (deny), and hearing the Wi-Fi shout from the guest (`avahi-browse`). Old bash script stays until the pocket tool proves itself on real hardware.
+
+Size: days; blocked on a second physical machine.
+
+### R6 — Real robot world (done, share-faster follow-ups left)
+
+**What it is:** the sealed-box picture. Base (8.25GB: Ubuntu + robot brain Jazzy + physics Harmonic + TurtleBot3) → world (code editor + 3D data pipe + desktop, `WITH_SELKIES` switch) → Selkies 2.0 (pure-Python screen sharing, sound off by nature) → pre-packed 3D models (Ground Plane + Sun, 64KB, so robots move with no internet) → frozen version tags (`:jazzy-harmonic-<sha>`, never `:latest`: always the exact tested picture).
+
+**Shipped (CP27–CP38):** boots as student 1000, editor OK, desktop picture OK, sim pipe alive, TurtleBot3 `empty` world at full speed on plain CPU, zero download errors live. Packing math recorded: 2.4GB to send (≈25s wired, 1–4 min Wi-Fi, +1–3 min unpack ≈ 5–10 min per new laptop once, then kept), 10.8GB pinned per laptop.
+
+**Left (parallel, optional):** a local picture shelf (registry mirror on the organizer — worth it at ~5 laptops), wake-up pre-load during join, optional slimming (~1–1.5GB candidates measured, product parts stay), GPU sharing on real NVIDIA hardware (`SESSION_GPU_LIMIT=1` + device plugin). zstd/stargz/light-picture parked with reasons.
+
+Size: done; each follow-up about half a day.
+
+### R7 + P5/P6 — Sturdy + Windows + tidy docs (the last track)
+
+Encrypted traffic (TLS: scramble so Wi-Fi snoopers can't read), per-box walls (NetworkPolicy: boxes can't snoop each other), per-student limits (quotas), watch screens (Prometheus/Grafana: graphs), log collection. Plus: prove a Windows/WSL2 laptop joins, retire `join-cluster.sh`, refresh `plan.md`. Each piece ships alone; start with encryption + limits when leaving the trusted-classroom stage.
+
+## 3. Suggested Order
+
+| Step | Item | Why here | Size |
 |---|---|---|---|
-| 1 | ~~R1 legacy ingress removal~~ done (checkpoint-13) | Cleanup complete | < 1h |
-| 2 | R3 CSRF protection | Small, closes a real browser-threat hole | 0.5 day |
-| 3 | R2 session persistence | Medium; stops the restart-orphan pain | 0.5–2 days |
-| 4 | R4 student frontend | Large but fully unblocked by the verified API | days |
-| 5 | R5 host onboarding | Needs a second physical laptop | days |
-| 6 | R7 hardening | As you approach real users | ongoing |
-| ∥ | R6 real image (parallel) | Heavy; run alongside whenever hardware/disk allow | 1+ day |
+| 1 | ~~R1 old hallways~~ done | Gone | < 1h |
+| 2 | ~~R3 click safety~~ shipped + **login small fix** | Unblocks returning logins | < 0.5 day |
+| 3 | ~~R2 notebook~~ shipped + **full disk memory + graceful updates** | Ends lost-box incidents for good | 0.5–2 days |
+| 4 | ~~R4 website~~ done + **pretty 3D viewer** | Last website slice | 0.5 day |
+| 5 | ~~R6 real world~~ done (+ share-faster follow-ups in parallel) | Only extras left | 0.5 day each |
+| 6 | R5 two-laptop join | Needs a second physical laptop | days |
+| 7 | R7 sturdy (encryption first) | As real classes approach | ongoing |
+| 8 | P5 Windows + P6 docs sunset | Retire old script, refresh plan | days |
 
-Guide for contributors: pick the topmost unfinished row, read its section in
-§2, implement, verify with the listed checks, then record a checkpoint report
-in `local_dev_docs/` following the CP01–CP12 format. Update this map's
-"YOU ARE HERE" marker as items land.
+How to contribute: take the top unfinished row → read its checkpoints in `local_dev_docs/` newest-first → build → prove with the listed "done looks like" → write `checkpoint-NN-*.md` in CP style → move YOU ARE HERE. Desk updates on the organizer: delete the old copy first (hostNetwork door `:8082` fits one).
