@@ -79,6 +79,15 @@ func TestCSRFGuard(t *testing.T) {
 	if got := csrfReq(t, h, http.MethodPost, "/api/sessions", jwt, "", "").Code; got != http.StatusAccepted {
 		t.Errorf("bearer POST without cookie = %d, want 202", got)
 	}
+	// Stale-cookie re-login must pass the guard: the login endpoint
+	// issues tokens and can never require one (lockout regression).
+	stale := httptest.NewRequest(http.MethodPost, "/api/auth/login", strings.NewReader(`{"username":"u","password":"p"}`))
+	stale.AddCookie(&http.Cookie{Name: "ldndrc_session", Value: jwt})
+	staleRec := httptest.NewRecorder()
+	h.ServeHTTP(staleRec, stale)
+	if staleRec.Code != http.StatusOK {
+		t.Errorf("login POST with stale cookie = %d, want 200", staleRec.Code)
+	}
 	// Safe methods with a cookie but no token still pass the guard.
 	if got := csrfReq(t, h, http.MethodGet, "/api/sessions", "", jwt, "").Code; got != http.StatusUnauthorized {
 		t.Errorf("cookie GET without token = %d, want 401 (handler auth)", got)

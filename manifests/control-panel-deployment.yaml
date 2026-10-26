@@ -52,9 +52,8 @@ spec:
             # (immutable :jazzy-harmonic-<sha> tag, never :latest). The
             # 82MB demo stand-in remains available for k3d demo clusters
             # via a local override: ldndrc/demo-standin:dev.
-            # Selkies is deferred (WITH_SELKIES=0), so desktop stays
-            # 502-by-design; GPU stays "0" (CPU-only) until the nvidia
-            # device-plugin follow-up.
+            # Selkies 2.0.0 streams the desktop (see CP-34/35); GPU stays
+            # "0" (CPU-only) until the nvidia device-plugin follow-up.
             - name: SESSION_IMAGE
               value: ldndrc/ros2-gz:jazzy-harmonic-10f1f10c
             - name: SESSION_HOME_STORAGE
