@@ -32,7 +32,7 @@ func nodesHandler(t *testing.T, minter nodes.Minter) (http.Handler, *nodes.Store
 	if err != nil {
 		t.Fatal(err)
 	}
-	return NewRouterWithNodes(authService, sessions.NewStore(), store, minter), store
+	return NewRouterWithNodes(authService, sessions.NewStore(), store, minter, nil), store
 }
 
 func postNodeJSON(t *testing.T, handler http.Handler, method, path, token, body string) *httptest.ResponseRecorder {

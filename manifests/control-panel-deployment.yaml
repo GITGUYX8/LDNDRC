@@ -81,6 +81,13 @@ spec:
             # Deployments: existing adopted, missing tombstoned to stopped.
             - name: SESSIONS_DB
               value: /var/lib/ldndrc/sessions.json
+            # Portal download counter (CP-41): served-download counts for
+            # the LAN onboarding portal (/portal), JSON beside NODES_DB.
+            # On the panel PVC (R2-final), so counters survive pod
+            # redeploys. A corrupt/unreadable file disables the portal
+            # routes instead of crashing the control plane.
+            - name: DOWNLOADS_DB
+              value: /var/lib/ldndrc/downloads.json
             # Public K3s join URL handed to approved laptops. Must match
             # the master's current LAN address — this laptop's DHCP lease
             # drifts (CP-42: .37 → .65 → .42); a router DHCP reservation

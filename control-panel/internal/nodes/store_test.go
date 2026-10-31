@@ -30,6 +30,28 @@ func TestRegisterIsIdempotent(t *testing.T) {
 	}
 }
 
+// The node ID doubles as the enrollment bearer capability (polls,
+// diagnostics, portal re-checks authenticate by knowing it — never by
+// IP or MAC), so fresh IDs must carry real entropy: 16 random bytes,
+// 32 hex chars.
+func TestFreshNodeIDIsEnrollmentTokenStrength(t *testing.T) {
+	s := testStore(t)
+	first, _, err := s.Register("laptop-a", "linux", "amd64", 12, 32, "NVIDIA RTX 4060")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(first.ID) != 32 {
+		t.Fatalf("node ID length = %d, want 32 (128-bit enrollment token)", len(first.ID))
+	}
+	second, _, err := s.Register("laptop-b", "linux", "amd64", 8, 16, "none")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if second.ID == first.ID {
+		t.Fatal("distinct laptops must get distinct enrollment tokens")
+	}
+}
+
 func TestRegisterRejectsBadInput(t *testing.T) {
 	s := testStore(t)
 	for _, tc := range [][6]any{

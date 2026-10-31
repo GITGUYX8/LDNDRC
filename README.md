@@ -180,6 +180,28 @@ No hardware handy? Test the detection logic in ~2s without a cluster:
 # or: TEST_CPU=12 TEST_RAM=16 TEST_GPU=nvidia ./join-cluster.sh
 ```
 
+### 2b. LAN onboarding portal (captive-portal enrollment)
+
+On the onboarding Wi-Fi (hosted by the master, separate from the cluster router), a
+newly connected laptop gets a pre-approval portal with a live download counter:
+
+```bash
+# On the joining laptop (no internet needed — served by the master):
+curl http://<master-ip>:8082/portal          # or just open it in a browser
+curl -O http://<master-ip>:8082/portal/joining-cluster.sh   # Linux/macOS
+# Windows: http://<master-ip>:8082/portal/joining-cluster.ps1
+
+bash joining-cluster.sh      # registers + waits for instructor approval
+./test-joining.sh            # detection-logic regression tests, no network
+```
+
+The script registers the laptop (idempotent — safe to re-run), polls until the
+instructor allows or denies it in the Instructor console, then tries to switch Wi-Fi to
+the cluster network (manual instructions as fallback). Approved Hosts are offered the
+K3s agent install. The counter on the portal updates live; only *served* downloads are
+counted — details and the gateway-enforcement follow-up contract live in
+`docs/lan-onboarding-portal.md`.
+
 ### 3. GPU sharing (production Hosts)
 
 Install the NVIDIA GPU Operator, then enable time-slicing so one consumer GPU serves ~4 session pods (`plan.md` §Phase 2 has the exact ConfigMap + `ClusterPolicy` patch). Session pods request `nvidia.com/gpu: 1` each; set `SESSION_GPU_LIMIT=1` in the control-panel Deployment.
@@ -315,14 +337,15 @@ Gateway errors are plain and diagnosable: `401` = log in first, `404` = no activ
 ├── plan.md                 # Full design doc: overview, stack, ASCII arch, phased build plan
 ├── onboarding-design-report.md  # Zero-touch onboarding proposal (ldndrc-join binary) — under review
 ├── join-cluster.sh / test-join.sh  # Host-vs-Guest hardware gatekeeper + its regression tests
-├── control-panel/          # Go backend: cmd/server, internal/{auth,sessions,gateway,httpapi,nodes,join}
+├── test-joining.sh           # Regression tests for joining-cluster.sh (portal enrollment agent)
+├── control-panel/            # Go backend: cmd/server, internal/{auth,sessions,gateway,httpapi,nodes,portal,join}
 ├── manifests/              # K3s manifests: deployment, service, ingress, RBAC, secret example, headlamp
 ├── images/
 │   ├── workspace/          # Session image: code-server + Selkies + gazebo-web (supervised), ROS 2 + Gazebo
 │   ├── base/               # Base layers
 │   └── demo-standin/       # Tiny stand-in HTTP server so sessions reach `ready` without the full image
 ├── sim-web-app/            # gzweb WebSocket viewer (Vite test harness for the :9002 render path)
-├── docs/                   # roadmap.md (done-vs-remaining map), host-joiner-tui-spec.md, local-cluster-headlamp.md
+├── docs/                   # roadmap.md (done-vs-remaining map), host-joiner-tui-spec.md, lan-onboarding-portal.md, local-cluster-headlamp.md
 └── local_dev_docs/         # 15 build checkpoints (join logic → live K3s verification)
 ```
 
@@ -341,6 +364,11 @@ Gateway errors are plain and diagnosable: `401` = log in first, `404` = no activ
 | `POST` | `/api/nodes/{id}/approve` | Operator approves (JWT) |
 | `POST` | `/api/nodes/{id}/deny` | Operator denies with reason (JWT) |
 | `POST` | `/api/nodes/{id}/diagnostics` | Joining laptop uploads a ≤1MB diagnostics bundle |
+| `GET` | `/portal` | LAN onboarding portal page (pre-approval, live download counter) |
+| `GET` | `/portal/joining-cluster.sh` | Enrollment script download (Linux/macOS; counts served downloads) |
+| `GET` | `/portal/joining-cluster.ps1` | Enrollment script download (Windows PowerShell) |
+| `GET` | `/api/downloads/count` | Aggregate served-download counts (public, no device data) |
+| `GET` | `/api/downloads/stats` | Counter detail: requests + unique-device estimate (JWT) |
 | `GET` | `/healthz` | Liveness (`{"status":"ok"}`) |
 | `WS` | `/ws/{session}` | WebSocket proxy into a pod (code-server / gzweb / Selkies) |
 

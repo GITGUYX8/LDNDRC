@@ -90,6 +90,30 @@ and `K3S_JOIN_URL` set to the master's reachable address
 token but answer 503. A 5s watcher labels Ready nodes `role=host` and marks
 them `joined`.
 
+## LAN onboarding portal
+
+Pre-approval portal served from the same binary (design + gateway
+follow-up contract: `docs/lan-onboarding-portal.md`):
+
+```bash
+# any laptop on the onboarding Wi-Fi, before approval:
+open http://127.0.0.1:8082/portal
+curl -O http://127.0.0.1:8082/portal/joining-cluster.sh   # Linux/macOS
+curl -O http://127.0.0.1:8082/portal/joining-cluster.ps1  # Windows
+
+# live counter (public, aggregate only):
+curl http://127.0.0.1:8082/api/downloads/count
+# → {"artifacts":{"joining-cluster.ps1":0,"joining-cluster.sh":2},"total":2}
+
+# operator view incl. request counts + unique-device estimate (JWT):
+curl -H "Authorization: Bearer $TOKEN" http://127.0.0.1:8082/api/downloads/stats
+```
+
+Counts persist in `DOWNLOADS_DB` (default `/var/lib/ldndrc/downloads.json`,
+same emptyDir caveats as `NODES_DB`). "Requests" (HEAD/Range/retries) are
+counted separately from full served downloads, and neither proves the
+student saved or ran the file — the portal page says so explicitly.
+
 The session image must already be available to the K3s nodes. A session stays
 in `provisioning` until its Deployment reports an available replica, at which
 point the store promotes it to `ready` and the gateway starts routing to it.

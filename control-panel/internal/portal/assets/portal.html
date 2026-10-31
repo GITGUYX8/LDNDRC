@@ -1,0 +1,219 @@
+<!doctype html>
+<!--
+  LDNDRC onboarding portal (captive portal welcome page).
+
+  Served by the control panel at /portal BEFORE device approval:
+  no cookies, no JWT, no build step — plain HTML + inline CSS/JS so it
+  loads on a freshly connected laptop with zero prerequisites and no
+  internet access. The live counter polls GET /api/downloads/count
+  every 3s and updates in place (no page reload).
+
+  Theme mirrors control-panel/web/src/styles.css (Mission Control).
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>LDNDRC — Join the cluster</title>
+<style>
+  :root {
+    --bg: #0b0e14;
+    --panel: #12161f;
+    --panel-raised: #1a1f2b;
+    --line: #262d3d;
+    --ink: #e6e9f0;
+    --muted: #8b93a7;
+    --accent: #7c6cf5;
+    --accent-soft: rgba(124, 108, 245, 0.14);
+    --ok: #3ecf8e;
+    --radius: 10px;
+    --font-ui: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+    --font-mono: "JetBrains Mono", ui-monospace, "Cascadia Code", monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; min-height: 100%; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--font-ui);
+    display: flex;
+    justify-content: center;
+    padding: 2rem 1rem;
+  }
+  main { width: 100%; max-width: 640px; display: grid; gap: 1rem; }
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 1.25rem 1.4rem;
+  }
+  h1 { font-size: 1.35rem; margin: 0 0 0.25rem; }
+  h2 { font-size: 1rem; margin: 0 0 0.6rem; }
+  p, li { line-height: 1.55; margin: 0.35rem 0; }
+  .muted { color: var(--muted); }
+  .small { font-size: 0.85rem; }
+  .mono { font-family: var(--font-mono); }
+  code, pre {
+    font-family: var(--font-mono);
+    background: var(--panel-raised);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+  }
+  code { padding: 0.1rem 0.35rem; }
+  pre { padding: 0.7rem 0.9rem; overflow-x: auto; font-size: 0.85rem; margin: 0.5rem 0; }
+  a { color: var(--accent); }
+  .brand { color: var(--accent); }
+  .downloads {
+    display: flex; gap: 0.6rem; flex-wrap: wrap; align-items: stretch; margin-top: 0.6rem;
+  }
+  .dl-card {
+    flex: 1 1 220px;
+    background: var(--panel-raised);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 0.9rem 1rem;
+    display: grid; gap: 0.45rem;
+  }
+  .dl-card__name { font-family: var(--font-mono); font-size: 0.9rem; }
+  .dl-card__count { font-family: var(--font-mono); font-size: 1.6rem; color: var(--ink); }
+  .dl-card__count small { font-size: 0.75rem; color: var(--muted); font-family: var(--font-ui); }
+  .btn {
+    display: inline-block; text-align: center; text-decoration: none;
+    padding: 0.5rem 0.9rem; border-radius: 8px;
+    border: 1px solid var(--line); background: var(--panel);
+    color: var(--ink); font-size: 0.9rem;
+  }
+  .btn:hover { border-color: var(--accent); }
+  .btn--primary { background: var(--accent-soft); border-color: var(--accent); }
+  .live { display: inline-flex; align-items: center; gap: 0.4rem; }
+  .live__dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--muted); display: inline-block;
+  }
+  .live__dot--ok { background: var(--ok); }
+  .steps { padding-left: 1.2rem; }
+  .fine { color: var(--muted); font-size: 0.8rem; line-height: 1.5; }
+</style>
+</head>
+<body>
+<main>
+  <section class="card">
+    <h1><span class="brand mono">LDNDRC</span> — you're on the onboarding network</h1>
+    <p>
+      Welcome! This laptop is on the <strong>onboarding</strong> Wi-Fi, which only
+      reaches the cluster master. To join the ROS&nbsp;2 simulation cluster, download
+      the enrollment script below, run it on your laptop, and wait for the
+      instructor to approve your request. Afterwards, switch to the
+      <strong>cluster</strong> network.
+    </p>
+  </section>
+
+  <section class="card">
+    <h2>1 · Download the enrollment script</h2>
+    <p class="muted small">
+      Pick the one for your operating system. The file is served from this laptop's
+      master — no internet required.
+    </p>
+    <div class="downloads">
+      <div class="dl-card">
+        <span class="dl-card__name">joining-cluster.sh</span>
+        <span class="muted small">Linux &amp; macOS (bash)</span>
+        <span class="dl-card__count mono" id="count-sh">…</span>
+        <a class="btn btn--primary" href="/portal/joining-cluster.sh" download>Download for Linux/macOS</a>
+      </div>
+      <div class="dl-card">
+        <span class="dl-card__name">joining-cluster.ps1</span>
+        <span class="muted small">Windows (PowerShell)</span>
+        <span class="dl-card__count mono" id="count-ps1">…</span>
+        <a class="btn btn--primary" href="/portal/joining-cluster.ps1" download>Download for Windows</a>
+      </div>
+    </div>
+    <p class="muted small" style="margin-top: 0.8rem">
+      <span class="live"><span class="live__dot" id="live-dot"></span><span id="live-label">checking…</span></span>
+      &nbsp;·&nbsp; total served downloads so far: <span class="mono" id="count-total">…</span>
+      &nbsp;·&nbsp; updates live, no reload needed
+    </p>
+  </section>
+
+  <section class="card">
+    <h2>2 · Run it yourself — downloading is not installing</h2>
+    <p class="muted small">
+      The script only registers this laptop and waits for approval. It does nothing
+      until you run it.
+    </p>
+    <p><strong>Linux / macOS:</strong> open a terminal in your Downloads folder:</p>
+    <pre>chmod +x joining-cluster.sh
+bash joining-cluster.sh</pre>
+    <p><strong>Windows:</strong> open PowerShell in your Downloads folder:</p>
+    <pre>powershell -ExecutionPolicy Bypass -File joining-cluster.ps1</pre>
+    <p class="muted small">
+      If a download or run fails, just retry — re-running is safe: the master
+      recognizes your laptop and reuses the same join request instead of creating a
+      duplicate.
+    </p>
+  </section>
+
+  <section class="card">
+    <h2>3 · Wait for approval, then switch networks</h2>
+    <ol class="steps">
+      <li>The script registers this laptop with the instructor console.</li>
+      <li>The instructor approves or denies your request (the script shows the status live).</li>
+      <li>On approval the script tries to switch Wi-Fi to the cluster network
+          (<span class="mono">nmcli</span> on Linux, <span class="mono">netsh</span> on Windows);
+          otherwise it prints the manual steps.</li>
+      <li>Open <span class="mono">control.ros-platform.local</span> once you're on the
+          cluster network.</li>
+    </ol>
+  </section>
+
+  <section class="card">
+    <p class="fine">
+      Counter note: the download numbers reflect files <strong>served</strong> by this
+      server — they cannot tell whether anyone saved or executed the script.
+      "Requests" (preview probes, partial fetches, retries) are tracked separately from
+      served downloads. The unique-device figure is an estimate based on network
+      address and browser fingerprint; it is not identity and it is spoofable. No
+      personal data is stored: only aggregate counts leave this server, and only
+      instructors can see the detailed statistics.
+    </p>
+  </section>
+</main>
+<script>
+(function () {
+  "use strict";
+  var els = {
+    sh: document.getElementById("count-sh"),
+    ps1: document.getElementById("count-ps1"),
+    total: document.getElementById("count-total"),
+    dot: document.getElementById("live-dot"),
+    label: document.getElementById("live-label"),
+  };
+  var POLL_MS = 3000;
+
+  function render(data) {
+    var artifacts = (data && data.artifacts) || {};
+    els.sh.textContent = artifacts["joining-cluster.sh"] ?? 0;
+    els.ps1.textContent = artifacts["joining-cluster.ps1"] ?? 0;
+    els.total.textContent = (data && data.total) ?? 0;
+    els.dot.classList.add("live__dot--ok");
+    els.label.textContent = "live";
+  }
+  function markOffline() {
+    els.dot.classList.remove("live__dot--ok");
+    els.label.textContent = "counter offline (downloads still work)";
+  }
+  async function refresh() {
+    try {
+      var res = await fetch("/api/downloads/count", { cache: "no-store" });
+      if (!res.ok) throw new Error("status " + res.status);
+      render(await res.json());
+    } catch (err) {
+      markOffline();
+    }
+  }
+  void refresh();
+  setInterval(refresh, POLL_MS);
+})();
+</script>
+</body>
+</html>

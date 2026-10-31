@@ -13,6 +13,7 @@ import (
 	"github.com/ldndrc/control-panel/internal/gateway"
 	"github.com/ldndrc/control-panel/internal/httpapi"
 	"github.com/ldndrc/control-panel/internal/nodes"
+	"github.com/ldndrc/control-panel/internal/portal"
 	"github.com/ldndrc/control-panel/internal/sessions"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -44,6 +45,19 @@ func main() {
 	nodeStore, err := nodes.NewStore(nodeDB)
 	if err != nil {
 		log.Fatalf("load nodes db: %v", err)
+	}
+	// LAN onboarding portal (downloads + counter). The counter is not
+	// worth taking the control plane down over — an unreadable DB only
+	// disables the portal routes (unlike JWT/nodes, which log.Fatal).
+	portalDB := os.Getenv("DOWNLOADS_DB")
+	if portalDB == "" {
+		portalDB = "/var/lib/ldndrc/downloads.json"
+	}
+	var portalH *portal.Handler
+	if downloadsStore, err := portal.NewStore(portalDB); err != nil {
+		log.Printf("portal disabled: load downloads db: %v", err)
+	} else {
+		portalH = portal.NewHandler(downloadsStore)
 	}
 	var (
 		k8sClient kubernetes.Interface
@@ -93,7 +107,7 @@ func main() {
 			defer adv.Shutdown()
 		}
 	}
-	apiHandler := httpapi.NewRouterWithNodes(authSvc, sessionStore, nodeStore, minter)
+	apiHandler := httpapi.NewRouterWithNodes(authSvc, sessionStore, nodeStore, minter, portalH)
 	gatewayHandler := gateway.NewSessionHandler(authSvc, sessionStore, apiHandler)
 
 	server := &http.Server{

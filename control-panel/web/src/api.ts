@@ -148,3 +148,24 @@ export function denyNode(
     body: JSON.stringify({ reason }),
   });
 }
+
+// LAN onboarding portal stats (CP-41). GET /api/downloads/stats is
+// Bearer-gated like the nodes routes; the body adds served-download
+// request counts and a hashed unique-device estimate on top of the
+// public counts endpoint. Optional: on older panels the endpoint
+// doesn't exist, so callers treat a failure as "no stats".
+export interface DownloadArtifactStats {
+  requests: number;
+  downloads: number;
+  devices: number;
+}
+
+export interface DownloadStats {
+  artifacts: Record<string, DownloadArtifactStats>;
+  total: number;
+  unique_devices: number;
+}
+
+export function getDownloadStats(): Promise<DownloadStats> {
+  return request("/api/downloads/stats");
+}

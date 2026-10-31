@@ -282,7 +282,11 @@ func fingerprint(n *Node) string {
 }
 
 func newID() (string, error) {
-	var b [4]byte
+	// 16 bytes (128 bits) of randomness: the node ID doubles as the
+	// enrollment bearer capability — polls, diagnostics uploads, and
+	// portal re-checks authenticate by knowing it, never by IP or MAC.
+	// 4 bytes was "unguessable enough" only in the loosest LAN sense.
+	var b [16]byte
 	if _, err := rand.Read(b[:]); err != nil {
 		return "", err
 	}

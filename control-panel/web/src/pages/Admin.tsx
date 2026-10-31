@@ -4,8 +4,10 @@ import {
   approveNode,
   deleteSession,
   denyNode,
+  getDownloadStats,
   listNodes,
   listSessions,
+  type DownloadStats,
   type JoinNode,
   type NodeStatus,
   type Session,
@@ -225,6 +227,9 @@ function NodeCard({
 export function AdminPage() {
   const [nodes, setNodes] = useState<JoinNode[]>([]);
   const [sessions, setSessions] = useState<Session[]>([]);
+  const [downloads, setDownloads] = useState<DownloadStats | undefined>(
+    undefined,
+  );
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [busyNode, setBusyNode] = useState("");
@@ -236,12 +241,16 @@ export function AdminPage() {
 
   const refresh = useCallback(async () => {
     try {
-      const [{ nodes: n }, { sessions: s }] = await Promise.all([
+      // Portal stats are optional: an older panel without them must not
+      // blank the whole console, so this call degrades to undefined.
+      const [{ nodes: n }, { sessions: s }, d] = await Promise.all([
         listNodes(),
         listSessions(),
+        getDownloadStats().catch(() => undefined),
       ]);
       setNodes(n);
       setSessions(s);
+      setDownloads(d);
       setError("");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not load admin data.");
@@ -361,6 +370,23 @@ export function AdminPage() {
               <span className="metric__value mono">{sessions.length}</span>
               <span className="metric__label">sessions</span>
             </li>
+            {/* LAN onboarding portal (CP-41): served downloads of the
+                enrollment scripts + hashed distinct-downloader estimate.
+                Hidden silently when the panel predates the portal. */}
+            {downloads && (
+              <>
+                <li className="metric">
+                  <span className="metric__value mono">{downloads.total}</span>
+                  <span className="metric__label">script downloads</span>
+                </li>
+                <li className="metric">
+                  <span className="metric__value mono">
+                    {downloads.unique_devices}
+                  </span>
+                  <span className="metric__label">unique downloaders</span>
+                </li>
+              </>
+            )}
             {Object.entries(sessionCounts).map(([s, n]) => (
               <li className="metric" key={s}>
                 <span className="metric__value mono">{n}</span>

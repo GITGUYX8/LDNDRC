@@ -14,6 +14,7 @@ import (
 
 	"github.com/ldndrc/control-panel/internal/auth"
 	"github.com/ldndrc/control-panel/internal/nodes"
+	"github.com/ldndrc/control-panel/internal/portal"
 	"github.com/ldndrc/control-panel/internal/sessions"
 )
 
@@ -32,7 +33,7 @@ type sessionStore interface {
 // non-nil, enables the Host-onboarding node endpoints (minter may be nil
 // outside the cluster, in which case approved polls report unavailable).
 func NewRouter(authSvc *auth.Service, store ...sessionStore) http.Handler {
-	return NewRouterWithNodes(authSvc, firstStore(store), nil, nil)
+	return NewRouterWithNodes(authSvc, firstStore(store), nil, nil, nil)
 }
 
 func firstStore(store []sessionStore) sessionStore {
@@ -42,8 +43,11 @@ func firstStore(store []sessionStore) sessionStore {
 	return nil
 }
 
-// NewRouterWithNodes wires sessions plus the nodes onboarding API.
-func NewRouterWithNodes(authSvc *auth.Service, store sessionStore, nodeStore *nodes.Store, minter nodes.Minter) http.Handler {
+// NewRouterWithNodes wires sessions, the nodes onboarding API, and the
+// LAN onboarding portal. portalH, when non-nil, serves the pre-approval
+// captive portal and download-counter routes (no auth — untrusted
+// laptops must reach them).
+func NewRouterWithNodes(authSvc *auth.Service, store sessionStore, nodeStore *nodes.Store, minter nodes.Minter, portalH *portal.Handler) http.Handler {
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("GET /healthz", healthHandler)
@@ -282,9 +286,28 @@ func NewRouterWithNodes(authSvc *auth.Service, store sessionStore, nodeStore *no
 		})
 	}
 
+	if portalH != nil {
+		// LAN onboarding portal — reachable before device approval by
+		// design. All GET routes: they pass through guardCSRF untouched,
+		// and the count/stats endpoints are read-only.
+		mux.HandleFunc("GET /portal", portalH.Page)
+		mux.HandleFunc("GET /portal/{$}", portalH.Page)
+		mux.HandleFunc("GET /portal/"+portal.ArtifactSh, portalH.DownloadHandler(portal.ArtifactSh))
+		mux.HandleFunc("GET /portal/"+portal.ArtifactPs1, portalH.DownloadHandler(portal.ArtifactPs1))
+		mux.HandleFunc("GET /api/downloads/count", portalH.PublicCount)
+		mux.HandleFunc("GET /api/downloads/stats", func(w http.ResponseWriter, r *http.Request) {
+			if _, ok := bearerClaims(r, authSvc); !ok {
+				writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+				return
+			}
+			portalH.Stats(w, r)
+		})
+	}
+
 	// Student SPA (embedded UI-1 bundle, placeholder until then): exact
 	// dist files when present, index.html fallback for client routes.
-	// Registered last; /api/* and /healthz win by specificity.
+	// Registered last; /api/*, /healthz, and /portal routes win by
+	// specificity.
 	mux.HandleFunc("GET /", SPAHandler().ServeHTTP)
 
 	return logRequests(guardCSRF(authSvc, mux))
