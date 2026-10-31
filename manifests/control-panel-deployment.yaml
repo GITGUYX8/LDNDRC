@@ -8,6 +8,15 @@ metadata:
     app.kubernetes.io/part-of: ldndrc
 spec:
   replicas: 1
+  # hostNetwork pod binds :8082 on the node. A surge pod would fight the
+  # old pod for the port and deadlock forever (seen live, CP-20 §6), so
+  # rollouts must delete-old-first: maxSurge 0 scales the old RS down
+  # before the new pod is created.
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 0
+      maxUnavailable: 1
   selector:
     matchLabels:
       app.kubernetes.io/name: ldndrc-control-panel
@@ -63,22 +72,21 @@ spec:
             # Hosts use "1".
             - name: SESSION_GPU_LIMIT
               value: "0"
-            # Nodes onboarding DB (P1): emptyDir survives container restarts;
-            # a PVC or the shared R2 persistence solution replaces it later.
+            # Nodes onboarding DB (P1): on the panel PVC (R2-final), so
+            # approvals survive pod redeploys.
             - name: NODES_DB
               value: /var/lib/ldndrc/nodes.json
-            # Session records (R2): JSON beside NODES_DB, same emptyDir
-            # limits (survives container restarts, not pod redeploys).
+            # Session records (R2): JSON beside NODES_DB, same PVC.
             # On boot the panel reconciles loaded records against live
             # Deployments: existing adopted, missing tombstoned to stopped.
             - name: SESSIONS_DB
               value: /var/lib/ldndrc/sessions.json
-            # Public K3s join URL handed to approved laptops. Rehearsal value
-            # for the paired TUI run (nothing can actually join it — no real
-            # K3s master here); production sets the master's LAN address,
-            # e.g. https://192.168.1.50:6443.
+            # Public K3s join URL handed to approved laptops. Must match
+            # the master's current LAN address — this laptop's DHCP lease
+            # drifts (CP-42: .37 → .65 → .42); a router DHCP reservation
+            # is the standing fix.
             - name: K3S_JOIN_URL
-              value: "https://192.168.1.37:6443"
+              value: "https://192.168.1.42:6443"
             # Real master value: the pod runs on the host network (see
             # control-panel-hostnetwork-patch.yaml) so LAN multicast is
             # reachable and announcements escape to joining laptops.
@@ -96,6 +104,12 @@ spec:
             httpGet:
               path: /healthz
               port: http
+              # hostNetwork pod: pin loopback so probes survive host IP
+              # churn. Default (podIP) was baked in at pod creation and
+              # went stale on DHCP drift → 141-restart crashloop storm
+              # (CP-42). The panel listens on all interfaces, including
+              # the node's loopback.
+              host: 127.0.0.1
             initialDelaySeconds: 3
             periodSeconds: 5
             timeoutSeconds: 2
@@ -104,6 +118,7 @@ spec:
             httpGet:
               path: /healthz
               port: http
+              host: 127.0.0.1
             initialDelaySeconds: 10
             periodSeconds: 10
             timeoutSeconds: 2
@@ -115,5 +130,10 @@ spec:
               cpu: 250m
               memory: 256Mi
       volumes:
+        # PVC (R2-final): node DBs must survive pod redeploys, not just
+        # container restarts. Replacing the emptyDir swapped away the
+        # old nodes.json contents — approved laptops re-join via the
+        # join TUI (CP-42).
         - name: data
-          emptyDir: {}
+          persistentVolumeClaim:
+            claimName: ldndrc-control-panel-data

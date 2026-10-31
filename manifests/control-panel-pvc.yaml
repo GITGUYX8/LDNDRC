@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: ldndrc-control-panel-data
+  namespace: ldndrc
+  labels:
+    app.kubernetes.io/name: ldndrc-control-panel
+    app.kubernetes.io/part-of: ldndrc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: local-path
+  resources:
+    requests:
+      storage: 1Gi
