@@ -46,3 +46,7 @@ Thumbs.db
 .idea/
 .vscode/
 *.log
+
+# Python (tools/captive-portal trap)
+__pycache__/
+*.pyc

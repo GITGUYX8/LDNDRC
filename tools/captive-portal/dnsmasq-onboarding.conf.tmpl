@@ -1,0 +1,31 @@
+# LDNDRC onboarding hotspot — DHCP + wildcard DNS — GENERATED FILE.
+# Rendered from dnsmasq-onboarding.conf.tmpl by tools/captive-portal/run.sh.
+#
+# Runs as root via sudo (no file capabilities needed — this sidesteps the
+# NetworkManager-internal dnsmasq exec failure entirely). Daemonizes by
+# default:
+#
+#   start:  sudo dnsmasq --conf-file=<this-file>
+#   stop:   sudo kill "$(cat @PIDFILE@)"
+#
+# Requires the hotspot to be UP first (@AP_IP@ on @IFACE@).
+pid-file=@PIDFILE@
+
+interface=@IFACE@
+bind-dynamic
+
+# DHCP: give joining laptops @DHCP_START@-@DHCP_END@, master as router+DNS.
+dhcp-range=@DHCP_START@,@DHCP_END@,255.255.255.0,12h
+dhcp-option=3,@AP_IP@
+dhcp-option=6,@AP_IP@
+dhcp-authoritative
+
+# DNS: every hostname the student types resolves to the master, so an
+# http:// lookup lands on us and port-80 gets intercepted by nftables.
+address=/#/@AP_IP@
+
+# Do not consult the master's resolver or /etc/hosts — closed world.
+no-resolv
+no-hosts
+
+log-facility=@LOGFILE@

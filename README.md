@@ -202,6 +202,19 @@ K3s agent install. The counter on the portal updates live; only *served* downloa
 counted — details and the gateway-enforcement follow-up contract live in
 `docs/lan-onboarding-portal.md`.
 
+To make the network *actually* feel captive (OS "sign in to network" prompt), run the
+onboarding-AP harness — it starts the panel + redirect trap and prints the three root
+steps (hotspot, dnsmasq, nftables):
+
+```bash
+./tools/captive-portal/run.sh start    # unprivileged half, then the printed root block
+./tools/captive-portal/run.sh status   # panel / trap / hotspot / portal URL
+./test-captive-trap.sh                 # redirect contract, no root, ~2s
+```
+
+The harness is a workshop/demo rig, not gateway enforcement — see
+`tools/captive-portal/README.md`.
+
 ### 3. GPU sharing (production Hosts)
 
 Install the NVIDIA GPU Operator, then enable time-slicing so one consumer GPU serves ~4 session pods (`plan.md` §Phase 2 has the exact ConfigMap + `ClusterPolicy` patch). Session pods request `nvidia.com/gpu: 1` each; set `SESSION_GPU_LIMIT=1` in the control-panel Deployment.
@@ -338,6 +351,8 @@ Gateway errors are plain and diagnosable: `401` = log in first, `404` = no activ
 ├── onboarding-design-report.md  # Zero-touch onboarding proposal (ldndrc-join binary) — under review
 ├── join-cluster.sh / test-join.sh  # Host-vs-Guest hardware gatekeeper + its regression tests
 ├── test-joining.sh           # Regression tests for joining-cluster.sh (portal enrollment agent)
+├── test-captive-trap.sh      # Regression tests for the captive-portal redirect contract (no root)
+├── tools/captive-portal/     # Onboarding AP harness: run.sh, trap, nft + dnsmasq templates
 ├── control-panel/            # Go backend: cmd/server, internal/{auth,sessions,gateway,httpapi,nodes,portal,join}
 ├── manifests/              # K3s manifests: deployment, service, ingress, RBAC, secret example, headlamp
 ├── images/

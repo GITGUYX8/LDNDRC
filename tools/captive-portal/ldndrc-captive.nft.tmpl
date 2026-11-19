@@ -1,0 +1,22 @@
+#!/usr/sbin/nft -f
+# LDNDRC captive-portal interception — GENERATED FILE, do not edit.
+# Rendered from ldndrc-captive.nft.tmpl by tools/captive-portal/run.sh.
+#
+# Captures every port-80 packet arriving on the onboarding hotspot
+# (including the OS connectivity probes) and pushes it into the trap
+# server, which 302s everything to the portal.
+#
+# Apply:   sudo nft -f <this-file>
+# Remove:  sudo nft delete table ip ldndrc-captive
+#
+# Subnet-agnostic on purpose: NetworkManager may pick a different shared
+# subnet (cni0 already owns 10.42.0.1 here, so the hotspot may land on
+# 10.42.1.x) — matching on the interface alone is enough, because the
+# hotspot iface carries nothing but hotspot traffic.
+
+table ip ldndrc-captive {
+	chain prerouting {
+		type nat hook prerouting priority dstnat; policy accept;
+		iifname "@IFACE@" tcp dport 80 redirect to :@TRAP_PORT@
+	}
+}

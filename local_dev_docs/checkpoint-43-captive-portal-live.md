@@ -16,14 +16,21 @@ next test.
 
 ## What got built
 
-The test rig (deliberately outside the repo — it is a harness, not product):
+The test rig (initially kept outside the repo — it is a harness, not product).
+It was later promoted, parameterized, to `tools/captive-portal/` (checkpoint 43
+follow-up, committed right after this doc):
 
 | File | Friendly name | What it does |
 |---|---|---|
-| `~/ldndrc-portal-test/captive-trap.py` | The Doorman | Answers every intercepted web request with a 302 to the portal; derives the portal URL from the hotspot's own IP. |
-| `~/ldndrc-portal-test/ldndrc-captive.nft` | The Interceptor | nftables rule: any port-80 packet arriving on the hotspot interface gets redirected to the Doorman on `:8090`. |
-| `~/ldndrc-portal-test/dnsmasq-onboarding.conf` | The Clerk | Hands out DHCP leases (`192.168.4.50–150`) and answers **every** hostname with the master's IP. |
-| `~/ldndrc-portal-test/panel` | The Reception Desk | The new control-panel binary: portal page, script downloads, live counter (ran standalone on `:8083`). |
+| `tools/captive-portal/captive-trap.py` | The Doorman | Answers every intercepted web request with a 302 to the portal; derives the portal URL from the hotspot's own IP. |
+| `tools/captive-portal/ldndrc-captive.nft.tmpl` | The Interceptor | nftables rule: any port-80 packet arriving on the hotspot interface gets redirected to the Doorman on `:8090`. |
+| `tools/captive-portal/dnsmasq-onboarding.conf.tmpl` | The Clerk | Hands out DHCP leases (`192.168.4.50–150`) and answers **every** hostname with the master's IP. |
+| `tools/captive-portal/run.sh` | The Stage Manager | Builds/starts the panel + trap, renders the configs, prints the root steps. |
+| `tools/captive-portal/panel` (runtime) | The Reception Desk | The new control-panel binary: portal page, script downloads, live counter (ran standalone on `:8083`). |
+
+During the live session these lived ad-hoc in `~/ldndrc-portal-test/`; they now
+live in `tools/captive-portal/` and write runtime state to
+`~/.local/state/ldndrc-captive/`.
 
 Repo-side, this checkpoint also carries the portal feature commit
 (`383624d feat(portal): LAN onboarding portal + served-download counter`) and a tiny

@@ -1,7 +1,10 @@
 # LAN Onboarding Portal (Connection Approval Gate)
 
-Status: **implemented** (checkpoint 41). The soft-portal enrollment flow ships in the
-control panel binary; gateway-level enforcement is a designed follow-up.
+Status: **implemented** (checkpoint 41) and **verified on real hardware**
+(checkpoint 43). The soft-portal enrollment flow ships in the control panel
+binary; the onboarding AP + interception harness lives in
+[`tools/captive-portal/`](../tools/captive-portal/README.md); gateway-level
+enforcement is a designed follow-up.
 
 ## What it is
 
@@ -26,7 +29,7 @@ onboarding Wi-Fi (AP on master)          cluster router (separate device)
         │  http://<master-ip>:8082/portal
         ▼
   master laptop
-  ├─ onboarding AP (hostapd + dnsmasq)     ← infrastructure, not in the repo
+  ├─ onboarding AP (NM AP mode + dnsmasq + nft)  ← tools/captive-portal/
   ├─ K3s (control plane + Traefik)
   └─ control panel :8082 (hostNetwork)
      ├─ /portal                 welcome page (no auth — by design)
@@ -129,22 +132,47 @@ token, never IP/MAC. Existing stored IDs keep working.
 
 ## Onboarding AP setup (master laptop, infrastructure)
 
-Not part of the Go app — the master hosts a second Wi-Fi network with
-`hostapd` + `dnsmasq`, firewalled so unapproved clients reach only `:8082`:
+Not part of the Go app — the harness that makes the captive prompt real lives in
+[`tools/captive-portal/`](../tools/captive-portal/README.md):
 
 ```bash
-sudo apt install hostapd dnsmasq
-# /etc/dnsmasq.d/ldndrc-onboarding.conf:  serve 192.168.4.x DHCP; all DNS
-# answers → 192.168.4.1 so bare http:// attempts land on the panel.
-# /etc/hostapd/hostapd.conf:             ssid=ldndrc-onboarding, 2.4GHz, WPA2.
-# nftables:                              allow udp 67,53 + tcp → :8082; drop the rest.
-sudo systemctl enable --now hostapd dnsmasq
+./tools/captive-portal/run.sh start   # panel + trap; prints the root steps
+./tools/captive-portal/run.sh sudo    # hotspot, dnsmasq, nft (run as root)
 ```
 
-Because the soft portal does not redirect, students open `http://<master-ip>:8082`
-(the dnsmasq wildcard-DNS trick above makes most browser attempts land there anyway).
+What those root steps do:
+
+1. **Hotspot** — NetworkManager AP mode on the Wi-Fi interface, pinned to
+   `192.168.4.1/24` with `ipv4.method manual`. Do **not** use
+   `ipv4.method shared`: NM's internal dnsmasq fails to spawn on some hosts
+   (`Failed to execute child process "/usr/bin/dnsmasq" (Operation not
+   permitted)`) — that was the blocker on the reference laptop.
+2. **dnsmasq** (run as root, pid file in the runtime dir) — DHCP
+   `192.168.4.50–150` and wildcard DNS `address=/#/192.168.4.1`, so any
+   `http://` attempt resolves to the master.
+3. **nftables** — `iifname <hotspot> tcp dport 80 redirect to :8090`, matching
+   the interface rather than a subnet (NetworkManager's subnet can change).
+   The trap answers every intercepted request with
+   `302 → http://192.168.4.1:8082/portal`, including the OS connectivity
+   probes (`generate_204`, `connectivity-check.ubuntu.com`), which is what
+   triggers the OS "sign in to network" prompt.
+
+```bash
+# root teardown
+sudo nft delete table ip ldndrc-captive
+sudo kill "$(cat ~/.local/state/ldndrc-captive/dnsmasq.pid)"
+nmcli connection down ldndrc-onboarding
+```
+
+Test panel port: if a deployed control-panel pod already owns `:8082`
+(hostNetwork), start the harness with `PANEL_PORT=8083`; the trap and printed
+commands follow that port.
+
 The mDNS advertiser (`_ldndrc-master._tcp`, already in the panel) also answers
 "where is the master" for scripts using `avahi-browse`.
+
+`./test-captive-trap.sh` checks the redirect contract (302, `Location`,
+`no-store`, body refresh, HEAD/POST) in ~2 s with no root.
 
 ## Gateway enforcement (designed follow-up)
 
