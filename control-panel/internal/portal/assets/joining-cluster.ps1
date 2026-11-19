@@ -143,7 +143,7 @@ function Wait-Approval {
 
 $node = Wait-Approval
 if (-not $node) { exit 1 }
-Log "APPROVED! 🎉"
+Log "APPROVED! "
 
 # --- Switch to the cluster network --------------------------------------
 $Ssid = $env:CLUSTER_SSID
